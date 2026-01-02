@@ -3,6 +3,7 @@ import { Calendar, LogOut, Plus, User } from 'lucide-react';
 import { CreateEvent } from './create-event';
 import { EventList } from './event-list';
 import { API_BASE_URL } from '../utils/supabase-client';
+import { supabase } from '../utils/supabase-client';
 import type { Event, InviteeStatus } from '../types';
 
 interface DashboardProps {
@@ -16,20 +17,34 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Helper function to get fresh access token
+  const getFreshToken = async () => {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session) {
+      console.error('Error refreshing session:', error);
+      throw new Error('No valid session');
+    }
+    return session.access_token;
+  };
+
   useEffect(() => {
     fetchEvents();
   }, []);
 
   const fetchEvents = async () => {
     try {
+      const freshToken = await getFreshToken();
+      console.log('Fetching events with token:', freshToken ? 'Token exists' : 'No token');
+      
       const response = await fetch(`${API_BASE_URL}/events`, {
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${freshToken}`,
         },
       });
 
       if (!response.ok) {
-        console.error('Error fetching events:', await response.text());
+        const errorText = await response.text();
+        console.error('Error fetching events - Status:', response.status, 'Error:', errorText);
         return;
       }
 
@@ -44,18 +59,21 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
 
   const handleCreateEvent = async (eventData: Omit<Event, 'id' | 'organizer' | 'createdAt'>) => {
     try {
+      const freshToken = await getFreshToken();
+      console.log('Creating event with token:', freshToken ? 'Token exists' : 'No token');
+      
       const response = await fetch(`${API_BASE_URL}/events`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${freshToken}`,
         },
         body: JSON.stringify(eventData),
       });
 
       if (!response.ok) {
         const error = await response.text();
-        console.error('Error creating event:', error);
+        console.error('Error creating event - Status:', response.status, 'Error:', error);
         alert('Failed to create event. Please try again.');
         return;
       }
@@ -75,13 +93,14 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
     status: InviteeStatus
   ) => {
     try {
+      const freshToken = await getFreshToken();
       const response = await fetch(
         `${API_BASE_URL}/events/${eventId}/invitees/${encodeURIComponent(inviteeEmail)}/status`,
         {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
+            'Authorization': `Bearer ${freshToken}`,
           },
           body: JSON.stringify({ status }),
         }

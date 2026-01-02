@@ -18,7 +18,7 @@ export default function App() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         if (session?.user) {
           setUser({
             email: session.user.email || '',
@@ -43,6 +43,8 @@ export default function App() {
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
       
+      console.log('Checking session - Session exists:', !!session, 'Error:', error);
+      
       if (error) {
         console.error('Error checking session:', error);
         setLoading(false);
@@ -50,12 +52,15 @@ export default function App() {
       }
 
       if (session?.user) {
+        console.log('Session found - User:', session.user.email, 'Token length:', session.access_token?.length);
         setUser({
           email: session.user.email || '',
           name: session.user.user_metadata?.name || session.user.email || 'User',
           picture: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${session.user.email}`,
         });
         setAccessToken(session.access_token);
+      } else {
+        console.log('No session found');
       }
     } catch (error) {
       console.error('Unexpected error checking session:', error);
