@@ -128,10 +128,18 @@ app.post("/make-server-37f8437f/events", async (c) => {
 // Get all events for a user (organized + invited)
 app.get("/make-server-37f8437f/events", async (c) => {
   try {
-    const user = await getAuthenticatedUser(c.req.header('Authorization'));
+    console.log('📨 GET /events - Headers:', Object.fromEntries(c.req.raw.headers.entries()));
+    
+    const authHeader = c.req.header('Authorization');
+    console.log('🔐 Authorization header:', authHeader?.substring(0, 50) + '...');
+    
+    const user = await getAuthenticatedUser(authHeader);
     if (!user) {
-      return c.json({ error: 'Unauthorized' }, 401);
+      console.log('❌ Authentication failed, returning 401');
+      return c.json({ code: 401, message: 'Invalid JWT' }, 401);
     }
+    
+    console.log('✅ User authenticated, fetching events for:', user.email);
     
     const eventIds = new Set<string>();
     
@@ -143,6 +151,8 @@ app.get("/make-server-37f8437f/events", async (c) => {
     const invitedEventIds = await kv.get(`user_invitations:${user.email}`) || [];
     invitedEventIds.forEach((id: string) => eventIds.add(id));
     
+    console.log('📋 Found event IDs:', Array.from(eventIds));
+    
     // Fetch all events
     const events = [];
     for (const eventId of eventIds) {
@@ -152,9 +162,10 @@ app.get("/make-server-37f8437f/events", async (c) => {
       }
     }
     
+    console.log(`✅ Returning ${events.length} events`);
     return c.json({ events });
   } catch (error) {
-    console.log('Error fetching events:', error);
+    console.log('❌ Error fetching events:', error);
     return c.json({ error: 'Internal server error' }, 500);
   }
 });

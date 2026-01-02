@@ -20,21 +20,46 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
   // Helper function to get fresh access token
   const getFreshToken = async () => {
     const { data: { session }, error } = await supabase.auth.getSession();
+    console.log('🔍 Session check:', { 
+      hasSession: !!session, 
+      hasToken: !!session?.access_token,
+      tokenPreview: session?.access_token?.substring(0, 30),
+      error: error?.message 
+    });
+    
     if (error || !session) {
-      console.error('Error refreshing session:', error);
+      console.error('❌ Error getting session:', error);
       throw new Error('No valid session');
     }
+    
+    console.log('✅ Fresh token obtained');
     return session.access_token;
   };
 
   useEffect(() => {
+    console.log('🚀 Dashboard mounted, user:', user.email);
+    console.log('📦 Initial accessToken prop:', accessToken?.substring(0, 30));
     fetchEvents();
+    testBackendConnection();
   }, []);
+
+  // Test backend connectivity
+  const testBackendConnection = async () => {
+    try {
+      console.log('🔗 Testing backend connection...');
+      const response = await fetch(`${API_BASE_URL}/health`);
+      const data = await response.json();
+      console.log('✅ Backend connected:', data);
+    } catch (error) {
+      console.error('❌ Backend connection failed:', error);
+    }
+  };
 
   const fetchEvents = async () => {
     try {
+      console.log('📥 Fetching events...');
       const freshToken = await getFreshToken();
-      console.log('Fetching events with token:', freshToken ? `Token exists (${freshToken.substring(0, 20)}...)` : 'No token');
+      console.log('🔑 Using token for fetch:', freshToken.substring(0, 30) + '...');
       
       const response = await fetch(`${API_BASE_URL}/events`, {
         headers: {
