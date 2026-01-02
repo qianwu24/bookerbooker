@@ -34,7 +34,7 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
   const fetchEvents = async () => {
     try {
       const freshToken = await getFreshToken();
-      console.log('Fetching events with token:', freshToken ? 'Token exists' : 'No token');
+      console.log('Fetching events with token:', freshToken ? `Token exists (${freshToken.substring(0, 20)}...)` : 'No token');
       
       const response = await fetch(`${API_BASE_URL}/events`, {
         headers: {

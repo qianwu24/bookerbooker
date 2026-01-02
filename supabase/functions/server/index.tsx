@@ -29,21 +29,25 @@ app.get("/make-server-37f8437f/health", (c) => {
 // Helper function to get authenticated user
 async function getAuthenticatedUser(authHeader: string | null) {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.log('Missing or invalid Authorization header:', authHeader?.substring(0, 20));
     return null;
   }
   
   const accessToken = authHeader.split(' ')[1];
+  console.log('Validating token:', accessToken.substring(0, 30) + '...');
+  
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
   );
   
   const { data: { user }, error } = await supabase.auth.getUser(accessToken);
   if (error || !user) {
-    console.log('Authentication error while getting user:', error);
+    console.log('Authentication error while getting user:', error?.message, error?.status);
     return null;
   }
   
+  console.log('User authenticated successfully:', user.email);
   return user;
 }
 
