@@ -23,18 +23,21 @@ app.use(
 
 // Health check endpoint
 app.get("/make-server-37f8437f/health", (c) => {
-  return c.json({ status: "ok" });
+  console.log('🏥 Health check called');
+  return c.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 // Helper function to get authenticated user
 async function getAuthenticatedUser(authHeader: string | null) {
+  console.log('🔑 getAuthenticatedUser called with header:', authHeader?.substring(0, 50));
+  
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.log('Missing or invalid Authorization header:', authHeader?.substring(0, 20));
+    console.log('❌ Missing or invalid Authorization header:', authHeader?.substring(0, 20));
     return null;
   }
   
   const accessToken = authHeader.split(' ')[1];
-  console.log('Validating token:', accessToken.substring(0, 30) + '...');
+  console.log('🎫 Extracted token:', accessToken.substring(0, 30) + '...');
   
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',

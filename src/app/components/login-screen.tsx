@@ -1,16 +1,30 @@
-import { Calendar } from 'lucide-react';
+import { Calendar, ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { supabase } from '../utils/supabase-client';
+import { Button } from './ui/button';
 
 interface LoginScreenProps {
   onLogin: (user: { email: string; name: string; picture: string }) => void;
+  onBack?: () => void;
 }
 
-export function LoginScreen({ onLogin }: LoginScreenProps) {
+export function LoginScreen({ onLogin, onBack }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
+    
+    // MOCK LOGIN - bypassing actual Google OAuth
+    setTimeout(() => {
+      onLogin({
+        email: 'demo@booker.com',
+        name: 'Demo User',
+        picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=demo@booker.com'
+      });
+      setLoading(false);
+    }, 1000);
+    
+    /* Real Google OAuth - commented out for mock
     try {
       // Do not forget to complete setup at https://supabase.com/docs/guides/auth/social-login/auth-google
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -27,6 +41,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
     } finally {
       setLoading(false);
     }
+    */
   };
 
   return (
@@ -72,6 +87,17 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         <p className="text-center text-gray-500 text-sm mt-6">
           Secure authentication with Google OAuth
         </p>
+
+        {onBack && (
+          <Button
+            variant="outline"
+            className="w-full mt-4"
+            onClick={onBack}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Home
+          </Button>
+        )}
       </div>
     </div>
   );
