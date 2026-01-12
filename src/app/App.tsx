@@ -6,16 +6,15 @@ import { supabase } from './utils/supabase-client';
 
 export default function App() {
   const [user, setUser] = useState<{
+    id: string;
     email: string;
     name: string;
     picture: string;
   } | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false); // Changed to false for mock
+  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState<'home' | 'login'>('home');
 
-  // Commented out for mock sign in
-  /*
   useEffect(() => {
     // Check for existing session
     checkSession();
@@ -25,6 +24,7 @@ export default function App() {
       async (_event, session) => {
         if (session?.user) {
           setUser({
+              id: session.user.id,
             email: session.user.email || '',
             name: session.user.user_metadata?.name || session.user.email || 'User',
             picture: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${session.user.email}`,
@@ -59,6 +59,7 @@ export default function App() {
       if (session?.user) {
         console.log('Session found - User:', session.user.email, 'Token length:', session.access_token?.length);
         setUser({
+            id: session.user.id,
           email: session.user.email || '',
           name: session.user.user_metadata?.name || session.user.email || 'User',
           picture: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${session.user.email}`,
@@ -74,32 +75,16 @@ export default function App() {
       setLoading(false);
     }
   };
-  */
-
-  const handleLogin = (userData: {
-    email: string;
-    name: string;
-    picture: string;
-  }) => {
-    setUser(userData);
-    // Mock access token
-    setAccessToken('mock-access-token-12345');
-  };
 
   const handleLogout = async () => {
-    // Commented out for mock
-    /*
     try {
       await supabase.auth.signOut();
       setUser(null);
       setAccessToken(null);
+      setCurrentPage('home');
     } catch (error) {
       console.error('Error signing out:', error);
     }
-    */
-    setUser(null);
-    setAccessToken(null);
-    setCurrentPage('home');
   };
 
   if (loading) {
@@ -118,7 +103,7 @@ export default function App() {
       {user && accessToken ? (
         <Dashboard user={user} accessToken={accessToken} onLogout={handleLogout} />
       ) : currentPage === 'login' ? (
-        <LoginScreen onLogin={handleLogin} onBack={() => setCurrentPage('home')} />
+        <LoginScreen onBack={() => setCurrentPage('home')} />
       ) : (
         <HomePage onSignIn={() => setCurrentPage('login')} />
       )}

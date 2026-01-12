@@ -12,11 +12,12 @@ export function ContactList({ contacts, onDeleteContact }: ContactListProps) {
 
   const filteredContacts = contacts.filter(
     (contact) =>
-      contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (contact.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       contact.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'N/A';
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', {
       month: 'short',
@@ -73,7 +74,7 @@ export function ContactList({ contacts, onDeleteContact }: ContactListProps) {
           </div>
         ) : (
           filteredContacts
-            .sort((a, b) => b.lastInvitedAt.localeCompare(a.lastInvitedAt))
+            .sort((a, b) => (b.lastInvitedAt || '').localeCompare(a.lastInvitedAt || ''))
             .map((contact) => (
               <div
                 key={contact.email}
@@ -111,12 +112,12 @@ export function ContactList({ contacts, onDeleteContact }: ContactListProps) {
                         <div className="flex items-center gap-1">
                           <Calendar className="w-3.5 h-3.5" />
                           <span>
-                            Invited to <span className="font-semibold text-indigo-600">{contact.eventCount}</span> {contact.eventCount === 1 ? 'event' : 'events'}
+                            Invited to <span className="font-semibold text-indigo-600">{contact.eventCount ?? 0}</span> {(contact.eventCount ?? 0) === 1 ? 'event' : 'events'}
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
                           <span className="text-gray-400">•</span>
-                          <span>Last invited: {formatDate(contact.lastInvitedAt)}</span>
+                          <span>Last invited: {formatDate(contact.lastInvitedAt ?? contact.updatedAt ?? contact.createdAt)}</span>
                         </div>
                       </div>
                     </div>

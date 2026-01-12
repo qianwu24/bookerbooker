@@ -37,7 +37,9 @@ export interface Contact {
   email: string;
   name: string;
   phone?: string; // Optional phone number
-  addedAt: string; // When they were first added to contacts
-  eventCount: number; // Number of events they've been invited to
-  lastInvitedAt: string; // Last time they were invited to an event
+  addedAt?: string; // When they were first added to contacts
+  eventCount?: number; // Number of events they've been invited to
+  lastInvitedAt?: string; // Last time they were invited to an event
+  createdAt?: string;
+  updatedAt?: string;
 }

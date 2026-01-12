@@ -9,7 +9,7 @@ import { BookerLogo } from './booker-logo';
 import type { Event, InviteeStatus, Contact } from '../types';
 
 interface DashboardProps {
-  user: { email: string; name: string; picture: string };
+  user: { id: string; email: string; name: string; picture: string };
   accessToken: string;
   onLogout: () => void;
 }
@@ -46,224 +46,41 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
     return session.access_token;
   };
 
+  const normalizeEvent = (rawEvent: any): Event => {
+    const invitees = (rawEvent.invitees || []).map((inv: any) => ({
+      email: inv.email,
+      name: inv.name,
+      phone: inv.phone,
+      priority: inv.priority ?? 0,
+      status: inv.status as InviteeStatus,
+      invitedAt: inv.invitedAt ?? inv.created_at,
+    }));
+
+    return {
+      id: rawEvent.id,
+      title: rawEvent.title,
+      description: rawEvent.description || '',
+      date: rawEvent.date,
+      time: rawEvent.time,
+      location: rawEvent.location || '',
+      organizer: rawEvent.organizer || { email: user.email, name: user.name },
+      invitees,
+      inviteMode: rawEvent.inviteMode || 'priority',
+      autoPromoteInterval: rawEvent.autoPromoteInterval,
+      sendOrganizerCalendarInvite: rawEvent.sendOrganizerCalendarInvite ?? true,
+      sendInviteesCalendarInvite: rawEvent.sendInviteesCalendarInvite ?? true,
+      notifyByPhone: rawEvent.notifyByPhone ?? false,
+      createdAt: rawEvent.createdAt || rawEvent.created_at || new Date().toISOString(),
+    };
+  };
+
   useEffect(() => {
     console.log('🚀 Dashboard mounted, user:', user.email);
     console.log('📦 Initial accessToken prop:', accessToken?.substring(0, 30));
-    
-    // Load events from localStorage
-    const storedEvents = localStorage.getItem('booker_events');
-    if (storedEvents) {
-      try {
-        setEvents(JSON.parse(storedEvents));
-      } catch (error) {
-        console.error('Error parsing stored events:', error);
-      }
-    } else {
-      // Add mock events if no stored events exist
-      const now = new Date();
-      const mockEvents: Event[] = [
-        // 1. APPROACHING EVENT - 12 hours from now
-        {
-          id: 'mock-approaching-1',
-          title: 'Team Standup Meeting',
-          description: 'Daily standup to discuss progress and blockers',
-          date: new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString().split('T')[0],
-          time: '10:00',
-          location: 'Conference Room A',
-          organizer: {
-            email: user.email,
-            name: user.name,
-          },
-          invitees: [
-            { email: 'sarah@example.com', name: 'Sarah Chen', priority: 1, status: 'accepted', invitedAt: new Date().toISOString() },
-            { email: 'mike@example.com', name: 'Mike Johnson', priority: 2, status: 'invited', invitedAt: new Date().toISOString() },
-          ],
-          inviteMode: 'first-come-first-serve',
-          sendOrganizerCalendarInvite: true,
-          sendInviteesCalendarInvite: true,
-          notifyByPhone: false,
-          createdAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        // 2. APPROACHING EVENT - 18 hours from now
-        {
-          id: 'mock-approaching-2',
-          title: 'Client Presentation',
-          description: 'Q1 results presentation for client',
-          date: new Date(now.getTime() + 18 * 60 * 60 * 1000).toISOString().split('T')[0],
-          time: '14:30',
-          location: 'Virtual - Zoom',
-          organizer: {
-            email: user.email,
-            name: user.name,
-          },
-          invitees: [
-            { email: 'client@company.com', name: 'John Smith', priority: 1, status: 'pending', invitedAt: undefined },
-            { email: 'backup@company.com', name: 'Jane Doe', priority: 2, status: 'pending', invitedAt: undefined },
-          ],
-          inviteMode: 'priority',
-          autoPromoteInterval: 60,
-          sendOrganizerCalendarInvite: true,
-          sendInviteesCalendarInvite: true,
-          notifyByPhone: false,
-          createdAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        // 3. UPCOMING/FUTURE EVENT - 3 days from now
-        {
-          id: 'mock-future-1',
-          title: 'Product Launch Event',
-          description: 'Launching our new product line with stakeholders',
-          date: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          time: '11:00',
-          location: 'Main Auditorium',
-          organizer: {
-            email: user.email,
-            name: user.name,
-          },
-          invitees: [
-            { email: 'ceo@company.com', name: 'Alex Rivera', priority: 1, status: 'invited', invitedAt: new Date().toISOString() },
-            { email: 'cto@company.com', name: 'Emma Watson', priority: 2, status: 'invited', invitedAt: new Date().toISOString() },
-            { email: 'cmo@company.com', name: 'David Lee', priority: 3, status: 'invited', invitedAt: new Date().toISOString() },
-          ],
-          inviteMode: 'first-come-first-serve',
-          sendOrganizerCalendarInvite: true,
-          sendInviteesCalendarInvite: true,
-          notifyByPhone: false,
-          createdAt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        // 4. FUTURE EVENT - 1 week from now
-        {
-          id: 'mock-future-2',
-          title: 'Team Building Workshop',
-          description: 'Fun activities and team bonding exercises',
-          date: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          time: '09:00',
-          location: 'Outdoor Park',
-          organizer: {
-            email: user.email,
-            name: user.name,
-          },
-          invitees: [
-            { email: 'team1@example.com', name: 'Alice Cooper', priority: 1, status: 'pending', invitedAt: undefined },
-            { email: 'team2@example.com', name: 'Bob Martin', priority: 2, status: 'pending', invitedAt: undefined },
-            { email: 'team3@example.com', name: 'Carol White', priority: 3, status: 'pending', invitedAt: undefined },
-          ],
-          inviteMode: 'priority',
-          autoPromoteInterval: 120,
-          sendOrganizerCalendarInvite: true,
-          sendInviteesCalendarInvite: true,
-          notifyByPhone: false,
-          createdAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        // 5. COMPLETED EVENT - 2 days ago with accepted invitees
-        {
-          id: 'mock-completed-1',
-          title: 'Sprint Planning Meeting',
-          description: 'Planning for Sprint 23',
-          date: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          time: '15:00',
-          location: 'Conference Room B',
-          organizer: {
-            email: user.email,
-            name: user.name,
-          },
-          invitees: [
-            { email: 'dev1@example.com', name: 'Tom Hardy', priority: 1, status: 'accepted', invitedAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString() },
-            { email: 'dev2@example.com', name: 'Lisa Brown', priority: 2, status: 'accepted', invitedAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString() },
-            { email: 'dev3@example.com', name: 'James Wilson', priority: 3, status: 'declined', invitedAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString() },
-          ],
-          inviteMode: 'first-come-first-serve',
-          sendOrganizerCalendarInvite: true,
-          sendInviteesCalendarInvite: true,
-          notifyByPhone: false,
-          createdAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        // 6. COMPLETED EVENT - 1 week ago
-        {
-          id: 'mock-completed-2',
-          title: 'Client Onboarding Session',
-          description: 'Onboarding new client to our platform',
-          date: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          time: '13:00',
-          location: 'Virtual - Google Meet',
-          organizer: {
-            email: user.email,
-            name: user.name,
-          },
-          invitees: [
-            { email: 'newclient@corp.com', name: 'Robert Davis', priority: 1, status: 'accepted', invitedAt: new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000).toISOString() },
-          ],
-          inviteMode: 'priority',
-          autoPromoteInterval: 30,
-          sendOrganizerCalendarInvite: true,
-          sendInviteesCalendarInvite: true,
-          notifyByPhone: false,
-          createdAt: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        // 7. NO-SHOW EVENT - 3 days ago with no accepted invitees
-        {
-          id: 'mock-noshow-1',
-          title: 'Optional Coffee Chat',
-          description: 'Casual coffee and networking',
-          date: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          time: '16:00',
-          location: 'Office Cafeteria',
-          organizer: {
-            email: user.email,
-            name: user.name,
-          },
-          invitees: [
-            { email: 'person1@example.com', name: 'Chris Evans', priority: 1, status: 'declined', invitedAt: new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000).toISOString() },
-            { email: 'person2@example.com', name: 'Mark Taylor', priority: 2, status: 'declined', invitedAt: new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000).toISOString() },
-          ],
-          inviteMode: 'first-come-first-serve',
-          sendOrganizerCalendarInvite: false,
-          sendInviteesCalendarInvite: false,
-          notifyByPhone: false,
-          createdAt: new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        // 8. NO-SHOW EVENT - 5 days ago
-        {
-          id: 'mock-noshow-2',
-          title: 'Networking Event',
-          description: 'Industry networking meetup',
-          date: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          time: '18:30',
-          location: 'Downtown Hotel',
-          organizer: {
-            email: user.email,
-            name: user.name,
-          },
-          invitees: [
-            { email: 'contact1@company.com', name: 'Nancy Green', priority: 1, status: 'pending', invitedAt: undefined },
-            { email: 'contact2@company.com', name: 'Paul Anderson', priority: 2, status: 'pending', invitedAt: undefined },
-          ],
-          inviteMode: 'priority',
-          autoPromoteInterval: 90,
-          sendOrganizerCalendarInvite: true,
-          sendInviteesCalendarInvite: true,
-          notifyByPhone: false,
-          createdAt: new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-      ];
-      
-      setEvents(mockEvents);
-      localStorage.setItem('booker_events', JSON.stringify(mockEvents));
-      console.log('✅ Added mock events for testing');
-    }
-    
-    // Load contacts from localStorage
-    const storedContacts = localStorage.getItem('booker_contacts');
-    if (storedContacts) {
-      try {
-        setContacts(JSON.parse(storedContacts));
-      } catch (error) {
-        console.error('Error parsing stored contacts:', error);
-      }
-    }
-    setLoading(false);
-    // Commenting out API calls for local testing
-    // fetchEvents();
-    // testBackendConnection();
+
+    fetchEvents();
+    fetchContacts();
+    testBackendConnection();
   }, []);
 
   // Test backend connectivity
@@ -297,7 +114,8 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
       }
 
       const data = await response.json();
-      setEvents(data.events || []);
+      const normalized = (data.events || []).map((evt: any) => normalizeEvent(evt));
+      setEvents(normalized);
     } catch (error) {
       console.error('Error fetching events:', error);
     } finally {
@@ -305,51 +123,83 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
     }
   };
 
-  // Update contacts based on invitees in an event
-  const updateContactsFromEvent = (eventData: Omit<Event, 'id' | 'organizer' | 'createdAt'>) => {
-    const now = new Date().toISOString();
-    const updatedContacts = [...contacts];
-    
-    eventData.invitees.forEach((invitee) => {
-      const existingContactIndex = updatedContacts.findIndex(
-        (c) => c.email.toLowerCase() === invitee.email.toLowerCase()
-      );
-      
-      if (existingContactIndex >= 0) {
-        // Update existing contact
-        updatedContacts[existingContactIndex] = {
-          ...updatedContacts[existingContactIndex],
-          name: invitee.name, // Update name in case it changed
-          phone: invitee.phone || updatedContacts[existingContactIndex].phone, // Update phone if provided
-          eventCount: updatedContacts[existingContactIndex].eventCount + 1,
-          lastInvitedAt: now,
-        };
-      } else {
-        // Add new contact
-        updatedContacts.push({
-          email: invitee.email,
-          name: invitee.name,
-          phone: invitee.phone,
-          addedAt: now,
-          eventCount: 1,
-          lastInvitedAt: now,
-        });
+  const fetchContacts = async () => {
+    try {
+      console.log('📒 Fetching contacts...');
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('owner_id', user.id)
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching contacts:', error.message);
+        return;
       }
-    });
-    
-    setContacts(updatedContacts);
-    localStorage.setItem('booker_contacts', JSON.stringify(updatedContacts));
-    console.log('✅ Contacts updated:', updatedContacts.length);
+
+      const mapped = (data || []).map((c) => ({
+        email: c.email,
+        name: c.name || c.email,
+        phone: c.phone || undefined,
+        addedAt: c.created_at,
+        lastInvitedAt: c.updated_at || c.created_at,
+        eventCount: 0,
+        createdAt: c.created_at,
+        updatedAt: c.updated_at,
+      }));
+
+      setContacts(mapped);
+    } catch (error) {
+      console.error('Unexpected error fetching contacts:', error);
+    }
+  };
+
+  // Update contacts based on invitees in an event
+  const updateContactsFromEvent = async (eventData: Omit<Event, 'id' | 'organizer' | 'createdAt'>) => {
+    try {
+      const records = eventData.invitees.map((invitee) => ({
+        email: invitee.email,
+        owner_id: user.id,
+        name: invitee.name,
+        phone: invitee.phone,
+      }));
+
+      const { error } = await supabase.from('contacts').upsert(records, { onConflict: 'email' });
+      if (error) {
+        console.error('Error upserting contacts:', error.message);
+      }
+
+      await fetchContacts();
+    } catch (error) {
+      console.error('Unexpected error updating contacts:', error);
+    }
   };
 
   // Delete a contact
   const handleDeleteContact = (email: string) => {
-    const updatedContacts = contacts.filter(
-      (c) => c.email.toLowerCase() !== email.toLowerCase()
-    );
-    setContacts(updatedContacts);
-    localStorage.setItem('booker_contacts', JSON.stringify(updatedContacts));
-    console.log('✅ Contact deleted:', email);
+    const performDelete = async () => {
+      try {
+        const { error } = await supabase
+          .from('contacts')
+          .delete()
+          .eq('email', email)
+          .eq('owner_id', user.id);
+
+        if (error) {
+          console.error('Error deleting contact:', error.message);
+          alert('Failed to delete contact.');
+          return;
+        }
+
+        setContacts((prev) => prev.filter((c) => c.email.toLowerCase() !== email.toLowerCase()));
+        console.log('✅ Contact deleted:', email);
+      } catch (error) {
+        console.error('Unexpected error deleting contact:', error);
+        alert('An error occurred while deleting the contact.');
+      }
+    };
+
+    performDelete();
   };
 
   // Cancel an event with confirmation
@@ -365,39 +215,38 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
 
     if (!confirmed) return;
 
-    const updatedEvents = events.filter(e => e.id !== eventId);
-    setEvents(updatedEvents);
-    localStorage.setItem('booker_events', JSON.stringify(updatedEvents));
-    console.log('✅ Event cancelled:', eventId);
+    const performDelete = async () => {
+      try {
+        const freshToken = await getFreshToken();
+        const response = await fetch(`${API_BASE_URL}/events/${eventId}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${freshToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Error deleting event:', errorText);
+          alert('Failed to delete the event. Please try again.');
+          return;
+        }
+
+        setEvents((prev) => prev.filter((e) => e.id !== eventId));
+        console.log('✅ Event cancelled on backend:', eventId);
+      } catch (error) {
+        console.error('Error cancelling event:', error);
+        alert('An error occurred while deleting the event.');
+      }
+    };
+
+    performDelete();
   };
 
   const handleCreateEvent = async (eventData: Omit<Event, 'id' | 'organizer' | 'createdAt'>) => {
-    // Update contacts first
-    updateContactsFromEvent(eventData);
-    
-    // Local storage version - no API call
-    const newEvent: Event = {
-      ...eventData,
-      id: `event_${Date.now()}`,
-      organizer: {
-        email: user.email,
-        name: user.name,
-      },
-      inviteMode: eventData.inviteMode || 'priority', // Default to priority for backward compatibility
-      sendOrganizerCalendarInvite: eventData.sendOrganizerCalendarInvite ?? true, // Default to true
-      sendInviteesCalendarInvite: eventData.sendInviteesCalendarInvite ?? true, // Default to true
-      notifyByPhone: eventData.notifyByPhone ?? false, // Default to false
-      createdAt: new Date().toISOString(),
-    };
-    
-    const updatedEvents = [newEvent, ...events];
-    setEvents(updatedEvents);
-    localStorage.setItem('booker_events', JSON.stringify(updatedEvents));
-    setView('list');
-    
-    console.log('✅ Event created locally:', newEvent);
-    
-    /* Original API version - commented out for local testing
+    // Update contacts first (client-side address book)
+    await updateContactsFromEvent(eventData);
+
     try {
       const freshToken = await getFreshToken();
       console.log('Creating event with token:', freshToken ? 'Token exists' : 'No token');
@@ -419,13 +268,13 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
       }
 
       const data = await response.json();
-      setEvents((prevEvents) => [data.event, ...prevEvents]);
+      const normalized = normalizeEvent({ ...data.event, ...eventData });
+      setEvents((prevEvents) => [normalized, ...prevEvents]);
       setView('list');
     } catch (error) {
       console.error('Error creating event:', error);
       alert('An error occurred while creating the event.');
     }
-    */
   };
 
   const handleUpdateInviteeStatus = async (
@@ -433,22 +282,6 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
     inviteeEmail: string,
     status: InviteeStatus
   ) => {
-    // Local storage version - no API call
-    const updatedEvents = events.map((event) => {
-      if (event.id !== eventId) return event;
-      
-      const updatedInvitees = event.invitees.map((inv) =>
-        inv.email === inviteeEmail ? { ...inv, status } : inv
-      );
-      
-      return { ...event, invitees: updatedInvitees };
-    });
-    
-    setEvents(updatedEvents);
-    localStorage.setItem('booker_events', JSON.stringify(updatedEvents));
-    console.log('✅ Invitee status updated locally');
-    
-    /* Original API version - commented out for local testing
     try {
       const freshToken = await getFreshToken();
       const response = await fetch(
@@ -471,16 +304,16 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
       }
 
       const data = await response.json();
+      const normalized = normalizeEvent(data.event);
       setEvents((prevEvents) =>
         prevEvents.map((event) =>
-          event.id === eventId ? data.event : event
+          event.id === eventId ? { ...normalized, inviteMode: event.inviteMode ?? normalized.inviteMode } : event
         )
       );
     } catch (error) {
       console.error('Error updating invitee status:', error);
       alert('An error occurred while updating the status.');
     }
-    */
   };
 
   // Get today's date string in YYYY-MM-DD format

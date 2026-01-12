@@ -4,44 +4,34 @@ import { supabase } from '../utils/supabase-client';
 import { Button } from './ui/button';
 
 interface LoginScreenProps {
-  onLogin: (user: { email: string; name: string; picture: string }) => void;
   onBack?: () => void;
 }
 
-export function LoginScreen({ onLogin, onBack }: LoginScreenProps) {
+export function LoginScreen({ onBack }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    
-    // MOCK LOGIN - bypassing actual Google OAuth
-    setTimeout(() => {
-      onLogin({
-        email: 'demo@booker.com',
-        name: 'Demo User',
-        picture: 'https://api.dicebear.com/7.x/avataaars/svg?seed=demo@booker.com'
-      });
-      setLoading(false);
-    }, 1000);
-    
-    /* Real Google OAuth - commented out for mock
+
     try {
-      // Do not forget to complete setup at https://supabase.com/docs/guides/auth/social-login/auth-google
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+        },
       });
 
       if (error) {
         console.error('Error during Google sign in:', error);
         alert('Failed to sign in with Google. Please try again.');
+        setLoading(false);
       }
+      // On success, Supabase will redirect; no need to clear loading here.
     } catch (error) {
       console.error('Unexpected error during Google sign in:', error);
       alert('An unexpected error occurred. Please try again.');
-    } finally {
       setLoading(false);
     }
-    */
   };
 
   return (
