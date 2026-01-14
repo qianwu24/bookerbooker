@@ -74,6 +74,15 @@ const padTime = (isoLike: string) => {
 
 const formatIcsDate = (iso: string) => iso.replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
 
+const toBase64 = (input: string) => {
+  const bytes = textEncoder.encode(input);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+};
+
 const buildIcs = (event: {
   id: string;
   title: string;
@@ -112,7 +121,7 @@ const buildIcs = (event: {
     'END:VCALENDAR',
   ].filter(Boolean).join('\r\n');
 
-  const content = btoa(lines);
+  const content = toBase64(lines);
   return { filename: 'event.ics', content } as EmailAttachment;
 };
 
