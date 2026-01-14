@@ -172,6 +172,13 @@ const buildRsvpPage = (options: {
   badge?: string;
 }) => {
   const { title, detail, eventTitle, eventWhen, accentColor = '#4f46e5', badge = '✓' } = options;
+  const eventBlock = (eventTitle || eventWhen)
+    ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:18px;">
+         ${eventTitle ? `<div style="font-weight:700;color:#0f172a;">${eventTitle}</div>` : ''}
+         ${eventWhen ? `<div style="color:#475569;margin-top:4px;">${eventWhen}</div>` : ''}
+       </div>`
+    : '';
+
   return `<!doctype html>
     <html lang="en">
       <head>
@@ -186,12 +193,7 @@ const buildRsvpPage = (options: {
           </div>
           <h2 style="margin:0 0 8px 0;font-size:22px;text-align:center;color:#0f172a;">${title}</h2>
           <p style="margin:0 0 16px 0;text-align:center;color:#475569;">${detail}</p>
-          ${(eventTitle || eventWhen) ? `
-            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:18px;">
-              ${eventTitle ? `<div style=\"font-weight:700;color:#0f172a;\">${eventTitle}</div>` : ''}
-              ${eventWhen ? `<div style=\"color:#475569;margin-top:4px;\">${eventWhen}</div>` : ''}
-            </div>
-          ` : ''}
+          ${eventBlock}
           <div style="text-align:center;">
             <a href="${APP_BASE_URL}" style="display:inline-block;padding:12px 16px;border-radius:10px;background:#4f46e5;color:#ffffff;text-decoration:none;font-weight:700;">Return to Booker</a>
           </div>
