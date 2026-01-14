@@ -17,7 +17,7 @@ export function LoginScreen({ onBack }: LoginScreenProps) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: import.meta.env.VITE_APP_BASE_URL || window.location.origin,
         },
       });
 
