@@ -27,6 +27,7 @@ export function EventCard({
   const currentUserInvitee = event.invitees.find(
     (inv) => inv.email === currentUser.email
   );
+  const isAcceptedByCurrentUser = currentUserInvitee?.status === 'accepted';
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -78,6 +79,9 @@ export function EventCard({
 
   // Get card styling based on event status
   const getCardStyle = () => {
+    if (isAcceptedByCurrentUser) {
+      return 'border-emerald-300 bg-emerald-50/50 ring-1 ring-emerald-200 shadow-sm';
+    }
     switch (eventStatus) {
       case 'completed':
         return 'border-green-300 bg-green-50/30';
@@ -93,6 +97,14 @@ export function EventCard({
 
   // Get status badge
   const getStatusBadge = () => {
+    if (isAcceptedByCurrentUser) {
+      return (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-medium shadow-inner">
+          <CheckCircle className="w-4 h-4" />
+          <span>You're confirmed</span>
+        </div>
+      );
+    }
     switch (eventStatus) {
       case 'completed':
         return (

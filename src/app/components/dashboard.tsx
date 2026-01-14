@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, LogOut, Plus, User, X, Filter, Users, Settings } from 'lucide-react';
+import { Calendar, LogOut, Plus, User, X, Filter, Users, Settings, CheckCircle } from 'lucide-react';
 import { CreateEvent } from './create-event';
 import { EventList } from './event-list';
 import { ContactList } from './contact-list';
@@ -27,6 +27,7 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
   const [showInviteeFilter, setShowInviteeFilter] = useState(false);
   const [selectedInvitees, setSelectedInvitees] = useState<string[]>([]);
+  const [onlyScheduled, setOnlyScheduled] = useState(false);
 
   // Helper function to get fresh access token
   const getFreshToken = async () => {
@@ -403,6 +404,9 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
     });
   };
 
+  const isEventScheduled = (event: Event) =>
+    event.invitees.some(invitee => invitee.status === 'accepted');
+
   // Clear invitee filter
   const clearInviteeFilter = () => {
     setSelectedInvitees([]);
@@ -461,6 +465,10 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
       eventsToFilter = eventsToFilter.filter(event => 
         event.invitees.some(invitee => selectedInvitees.includes(invitee.email))
       );
+    }
+
+    if (onlyScheduled) {
+      eventsToFilter = eventsToFilter.filter(isEventScheduled);
     }
 
     return eventsToFilter;
@@ -696,6 +704,22 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                     </div>
                   )}
                 </div>
+
+                {/* Scheduled Filter Toggle */}
+                <button
+                  onClick={() => setOnlyScheduled((prev) => !prev)}
+                  className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+                    onlyScheduled
+                      ? 'bg-green-50 border-green-300 text-green-700 shadow-inner'
+                      : 'bg-white border-gray-300 text-gray-700 hover:border-indigo-300 hover:bg-indigo-50'
+                  }`}
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Scheduled only
+                  {onlyScheduled && (
+                    <span className="ml-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">On</span>
+                  )}
+                </button>
 
                 {/* Date Range Filter Button */}
                 <div className="relative">
