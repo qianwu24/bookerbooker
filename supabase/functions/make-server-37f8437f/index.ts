@@ -30,6 +30,10 @@ const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const RESEND_FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL');
 const RESEND_TEMPLATE_ID = Deno.env.get('RESEND_TEMPLATE_ID');
 const APP_BASE_URL = Deno.env.get('APP_BASE_URL') || 'https://bookerbooker.com';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
+// Functions base used for RSVP links so they hit the Edge Function directly (avoids SPA 404)
+const FUNCTION_BASE_URL = Deno.env.get('FUNCTION_BASE_URL') ||
+  (SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/make-server-37f8437f` : `${APP_BASE_URL}/make-server-37f8437f`);
 const RSVP_SECRET = Deno.env.get('RSVP_SECRET') || 'dev-secret-change-me';
 const DEFAULT_AUTO_PROMOTE_MINUTES = 30;
 
@@ -154,8 +158,8 @@ const buildRsvpUrls = async (eventId: string, inviteeEmail: string) => {
   const confirmToken = await createRsvpToken({ eventId, inviteeEmail, action: 'confirm', exp });
   const declineToken = await createRsvpToken({ eventId, inviteeEmail, action: 'decline', exp });
   return {
-    confirmUrl: `${APP_BASE_URL}/rsvp?token=${confirmToken}`,
-    declineUrl: `${APP_BASE_URL}/rsvp?token=${declineToken}`,
+    confirmUrl: `${FUNCTION_BASE_URL}/rsvp?token=${confirmToken}`,
+    declineUrl: `${FUNCTION_BASE_URL}/rsvp?token=${declineToken}`,
   };
 };
 
