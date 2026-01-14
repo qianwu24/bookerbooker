@@ -163,6 +163,44 @@ const buildRsvpUrls = async (eventId: string, inviteeEmail: string) => {
   };
 };
 
+const buildRsvpPage = (options: {
+  title: string;
+  detail: string;
+  eventTitle?: string;
+  eventWhen?: string;
+  accentColor?: string;
+  badge?: string;
+}) => {
+  const { title, detail, eventTitle, eventWhen, accentColor = '#4f46e5', badge = '✓' } = options;
+  return `<!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${title}</title>
+      </head>
+      <body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;background:#0f172a;color:#0b1220;">
+        <div style="max-width:520px;margin:48px auto;background:#ffffff;border-radius:12px;padding:28px;box-shadow:0 10px 30px rgba(15,23,42,0.18);">
+          <div style="text-align:center;margin-bottom:12px;">
+            <div style="display:inline-flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:999px;background:${accentColor};color:#ffffff;font-weight:700;">${badge}</div>
+          </div>
+          <h2 style="margin:0 0 8px 0;font-size:22px;text-align:center;color:#0f172a;">${title}</h2>
+          <p style="margin:0 0 16px 0;text-align:center;color:#475569;">${detail}</p>
+          ${(eventTitle || eventWhen) ? `
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:18px;">
+              ${eventTitle ? `<div style=\"font-weight:700;color:#0f172a;\">${eventTitle}</div>` : ''}
+              ${eventWhen ? `<div style=\"color:#475569;margin-top:4px;\">${eventWhen}</div>` : ''}
+            </div>
+          ` : ''}
+          <div style="text-align:center;">
+            <a href="${APP_BASE_URL}" style="display:inline-block;padding:12px 16px;border-radius:10px;background:#4f46e5;color:#ffffff;text-decoration:none;font-weight:700;">Return to Booker</a>
+          </div>
+        </div>
+        <p style="text-align:center;color:#cbd5e1;font-size:12px;margin-top:12px;">You can close this tab.</p>
+      </body>
+    </html>`;
+};
+
 const sendInviteEmail = async (
   invitee: InviteePayload,
   event: EventEmailPayload,
@@ -346,6 +384,59 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
     return c.json({ error: 'Invitee not found' }, 404);
   }
 
+  // Fetch event and current confirmed invitees (to enforce single-spot behavior)
+  const { data: event } = await supabase
+    .from('events')
+    .select(`
+      *,
+      organizer:users!events_organizer_id_fkey(id, email, name)
+    `)
+    .eq('id', eventId)
+    .single();
+
+  // If this invitee already confirmed, show an "already confirmed" page
+  if (invitee.status === 'confirmed' && action === 'confirm') {
+    const eventTitle = event?.title || 'Event';
+    const eventWhen = event?.date && event?.time
+      ? `${event.date} at ${event.time}${event?.time_zone ? ` (${event.time_zone})` : ''}`
+      : '';
+    const html = buildRsvpPage({
+      title: 'Already confirmed',
+      detail: 'You already have a confirmed spot for this event.',
+      eventTitle,
+      eventWhen,
+      accentColor: '#22c55e',
+      badge: '✓',
+    });
+    return c.html(html);
+  }
+
+  // If another invitee is already confirmed, block additional confirmations
+  if (action === 'confirm') {
+    const { data: confirmed } = await supabase
+      .from('invitees')
+      .select('email')
+      .eq('event_id', eventId)
+      .eq('status', 'confirmed');
+
+    const someoneElseConfirmed = (confirmed || []).some((row) => row.email !== inviteeEmail);
+    if (someoneElseConfirmed) {
+      const eventTitle = event?.title || 'Event';
+      const eventWhen = event?.date && event?.time
+        ? `${event.date} at ${event.time}${event?.time_zone ? ` (${event.time_zone})` : ''}`
+        : '';
+      const html = buildRsvpPage({
+        title: 'Spot already taken',
+        detail: 'Sorry, the spot has already been claimed by another invitee.',
+        eventTitle,
+        eventWhen,
+        accentColor: '#ef4444',
+        badge: '!',
+      });
+      return c.html(html, 409);
+    }
+  }
+
   const newStatus = action === 'confirm' ? 'confirmed' : 'declined';
 
   const { error: updateError } = await supabase
@@ -455,31 +546,14 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
     ? `${event.date} at ${event.time}${event?.time_zone ? ` (${event.time_zone})` : ''}`
     : '';
 
-  const html = `<!doctype html>
-    <html lang="en">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>${title}</title>
-      </head>
-      <body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;background:#0f172a;color:#0b1220;">
-        <div style="max-width:520px;margin:48px auto;background:#ffffff;border-radius:12px;padding:28px;box-shadow:0 10px 30px rgba(15,23,42,0.18);">
-          <div style="text-align:center;margin-bottom:12px;">
-            <div style="display:inline-flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:999px;background:${newStatus === 'confirmed' ? '#22c55e' : '#f97316'};color:#ffffff;font-weight:700;">${newStatus === 'confirmed' ? '✓' : '!'}</div>
-          </div>
-          <h2 style="margin:0 0 8px 0;font-size:22px;text-align:center;color:#0f172a;">${title}</h2>
-          <p style="margin:0 0 16px 0;text-align:center;color:#475569;">${detail}</p>
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:18px;">
-            <div style="font-weight:700;color:#0f172a;">${eventTitle}</div>
-            ${eventWhen ? `<div style="color:#475569;margin-top:4px;">${eventWhen}</div>` : ''}
-          </div>
-          <div style="text-align:center;">
-            <a href="${APP_BASE_URL}" style="display:inline-block;padding:12px 16px;border-radius:10px;background:#4f46e5;color:#ffffff;text-decoration:none;font-weight:700;">Return to Booker</a>
-          </div>
-        </div>
-        <p style="text-align:center;color:#cbd5e1;font-size:12px;margin-top:12px;">You can close this tab.</p>
-      </body>
-    </html>`;
+  const html = buildRsvpPage({
+    title,
+    detail,
+    eventTitle,
+    eventWhen,
+    accentColor: newStatus === 'confirmed' ? '#22c55e' : '#f97316',
+    badge: newStatus === 'confirmed' ? '✓' : '!',
+  });
 
   return c.html(html);
 });
