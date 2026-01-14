@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Calendar, Clock, MapPin, Plus, X, ArrowUp, ArrowDown, Users, Zap, UserPlus, AlertCircle, Phone } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Calendar, Clock, MapPin, Plus, X, ArrowUp, ArrowDown, Users, Zap, UserPlus, AlertCircle, ChevronDown } from 'lucide-react';
 import type { Event, Invitee, InviteMode, Contact } from '../types';
 
 interface CreateEventProps {
   currentUser: { email: string; name: string };
   contacts: Contact[];
+  timeZone?: string;
   onCreateEvent: (event: Omit<Event, 'id' | 'organizer' | 'createdAt'>) => void;
   onCancel: () => void;
 }
@@ -12,26 +13,43 @@ interface CreateEventProps {
 export function CreateEvent({
   currentUser,
   contacts,
+  timeZone,
   onCreateEvent,
   onCancel,
 }: CreateEventProps) {
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState('Tennis Match');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [location, setLocation] = useState('');
+  const [titleEmoji, setTitleEmoji] = useState('🎾');
+  const [locationHistory, setLocationHistory] = useState<string[]>([]);
+  const [showRecentLocations, setShowRecentLocations] = useState(false);
   const [invitees, setInvitees] = useState<Invitee[]>([]);
   const [newInviteeEmail, setNewInviteeEmail] = useState('');
   const [newInviteeName, setNewInviteeName] = useState('');
   const [newInviteePhone, setNewInviteePhone] = useState('');
-  const [inviteMode, setInviteMode] = useState<InviteMode>('priority');
+  const [inviteMode, setInviteMode] = useState<InviteMode>('first-come-first-serve');
   const [autoPromoteInterval, setAutoPromoteInterval] = useState<number>(30); // Default 30 minutes
-  const [sendOrganizerCalendarInvite, setSendOrganizerCalendarInvite] = useState<boolean>(true);
-  const [sendInviteesCalendarInvite, setSendInviteesCalendarInvite] = useState<boolean>(true);
-  const [notifyByPhone, setNotifyByPhone] = useState<boolean>(false);
+  const [durationMinutes, setDurationMinutes] = useState<number>(60);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [duplicateAlert, setDuplicateAlert] = useState<string | null>(null);
+
+  // Load cached locations on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('booker_recent_locations');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setLocationHistory(parsed);
+        }
+      } catch (err) {
+        console.error('Failed to parse cached locations', err);
+      }
+    }
+  }, []);
 
   // Email validation helper
   const isValidEmail = (email: string): boolean => {
@@ -39,13 +57,22 @@ export function CreateEvent({
     return emailRegex.test(email);
   };
 
-  // Date validation helper
-  const isValidDate = (dateStr: string): boolean => {
-    if (!dateStr) return false;
-    const selectedDate = new Date(dateStr);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time to start of day
-    return selectedDate >= today;
+  // Date/time validation helper
+  const isDateTimeInFuture = (dateStr: string, timeStr: string): boolean => {
+    if (!dateStr || !timeStr) return false;
+    const candidate = new Date(`${dateStr}T${timeStr}`);
+    if (Number.isNaN(candidate.getTime())) return false;
+    return candidate.getTime() >= Date.now();
+  };
+
+  // Persist recent locations (max 5, unique)
+  const rememberLocation = (loc: string) => {
+    const clean = loc.trim();
+    if (!clean) return;
+    const next = [clean, ...locationHistory.filter((l) => l !== clean)].slice(0, 5);
+    setLocationHistory(next);
+    localStorage.setItem('booker_recent_locations', JSON.stringify(next));
+    setShowRecentLocations(false);
   };
 
   // Add invitee from contact
@@ -164,16 +191,22 @@ export function CreateEvent({
     
     if (!date) {
       validationErrors.date = 'Event date is required';
-    } else if (!isValidDate(date)) {
-      validationErrors.date = 'Event date must be today or in the future';
     }
     
     if (!time) {
       validationErrors.time = 'Event time is required';
     }
+
+    if (date && time && !isDateTimeInFuture(date, time)) {
+      validationErrors.time = 'Event must be in the future (date/time)';
+    }
     
     if (invitees.length === 0) {
       validationErrors.invitees = 'Add at least one invitee';
+    }
+
+    if (!durationMinutes || durationMinutes <= 0) {
+      validationErrors.durationMinutes = 'Duration must be greater than 0 minutes';
     }
     
     if (inviteMode === 'priority') {
@@ -193,19 +226,24 @@ export function CreateEvent({
       return;
     }
 
+    const trimmedLocation = location.trim();
     const event: Omit<Event, 'id' | 'organizer' | 'createdAt'> = {
-      title,
+      title: titleEmoji ? `${titleEmoji} ${title.trim()}` : title.trim(),
       description,
       date,
       time,
-      location,
+      location: trimmedLocation,
+      timeZone: timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      durationMinutes,
       invitees,
       inviteMode,
       autoPromoteInterval: inviteMode === 'priority' ? autoPromoteInterval : undefined,
-      sendOrganizerCalendarInvite,
-      sendInviteesCalendarInvite,
-      notifyByPhone,
+      sendOrganizerCalendarInvite: true,
+      sendInviteesCalendarInvite: true,
+      notifyByPhone: false,
     };
+
+    rememberLocation(trimmedLocation);
 
     onCreateEvent(event);
   };
@@ -221,15 +259,32 @@ export function CreateEvent({
             <label htmlFor="title" className="block text-sm mb-2">
               Event Title *
             </label>
-            <input
-              id="title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Team Meeting"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-              required
-            />
+            <div className="flex gap-2">
+              <select
+                aria-label="Title emoji"
+                value={titleEmoji}
+                onChange={(e) => setTitleEmoji(e.target.value)}
+                className="w-14 px-2 py-2 text-lg text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white"
+              >
+                <option value="🎾">🎾</option>
+                <option value="📅">📅</option>
+                <option value="🎉">🎉</option>
+                <option value="🤝">🤝</option>
+                <option value="🧠">🧠</option>
+                <option value="📞">📞</option>
+                <option value="☕">☕</option>
+                <option value="">None</option>
+              </select>
+              <input
+                id="title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Team Meeting"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                required
+              />
+            </div>
             {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title}</p>}
           </div>
 
@@ -247,7 +302,7 @@ export function CreateEvent({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label htmlFor="date" className="block text-sm mb-2">
                 Date *
@@ -283,6 +338,31 @@ export function CreateEvent({
                 {errors.time && <p className="text-red-500 text-sm mt-1">{errors.time}</p>}
               </div>
             </div>
+
+            <div>
+              <label htmlFor="duration" className="block text-sm mb-2">
+                Duration *
+              </label>
+              <div className="relative">
+                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <select
+                  id="duration"
+                  value={durationMinutes}
+                  onChange={(e) => setDurationMinutes(parseInt(e.target.value, 10))}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none appearance-none bg-white"
+                  required
+                >
+                  {[30, 45, 60, 90, 120, 180].map((minutes) => (
+                    <option key={minutes} value={minutes}>
+                      {minutes === 60 ? '1 hour' : `${minutes} minutes`}
+                    </option>
+                  ))}
+                </select>
+                {errors.durationMinutes && (
+                  <p className="text-red-500 text-sm mt-1">{errors.durationMinutes}</p>
+                )}
+              </div>
+            </div>
           </div>
 
           <div>
@@ -297,8 +377,43 @@ export function CreateEvent({
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="Conference Room A"
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                className="w-full pl-10 pr-11 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
               />
+              {locationHistory.length > 0 && (
+                <button
+                  type="button"
+                  aria-label="Show recent locations"
+                  onClick={() => setShowRecentLocations((open) => !open)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100 focus:ring-2 focus:ring-indigo-500"
+                >
+                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                </button>
+              )}
+
+              {showRecentLocations && locationHistory.length > 0 && (
+                <div className="absolute z-10 mt-2 w-full max-h-48 overflow-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                  {locationHistory.map((loc) => (
+                    <button
+                      key={loc}
+                      type="button"
+                      onClick={() => {
+                        setLocation(loc);
+                        setShowRecentLocations(false);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:bg-indigo-50"
+                    >
+                      {loc}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setShowRecentLocations(false)}
+                    className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -308,41 +423,27 @@ export function CreateEvent({
               Invitation Type *
             </label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Priority-Based Option */}
+              {/* Priority-Based Option (disabled, coming soon) */}
               <button
                 type="button"
-                onClick={() => {
-                  setInviteMode('priority');
-                  // Reset all invitees to proper priority mode statuses
-                  setInvitees(invitees.map((inv, i) => ({
-                    ...inv,
-                    status: i === 0 ? 'invited' : 'pending'
-                  })));
-                }}
-                className={`p-4 rounded-xl border-2 transition-all text-left ${
-                  inviteMode === 'priority'
-                    ? 'border-indigo-600 bg-indigo-50'
-                    : 'border-gray-200 bg-white hover:border-indigo-300'
-                }`}
+                disabled
+                className="p-4 rounded-xl border-2 transition-all text-left border-gray-200 bg-white opacity-60 cursor-not-allowed"
               >
                 <div className="flex items-start gap-3">
-                  <div className={`p-2 rounded-lg ${
-                    inviteMode === 'priority' ? 'bg-indigo-600' : 'bg-gray-200'
-                  }`}>
-                    <Users className={`w-5 h-5 ${
-                      inviteMode === 'priority' ? 'text-white' : 'text-gray-600'
-                    }`} />
+                  <div className="p-2 rounded-lg bg-gray-200">
+                    <Users className="w-5 h-5 text-gray-600" />
                   </div>
                   <div className="flex-1">
-                    <h4 className={`font-semibold mb-1 ${
-                      inviteMode === 'priority' ? 'text-indigo-900' : 'text-gray-900'
-                    }`}>
+                    <h4 className="font-semibold mb-1 text-gray-900">
                       🎯 Priority-Based
                     </h4>
                     <p className="text-sm text-gray-600">
-                      Invite people in ranked order. When someone declines, the next person automatically gets the invite.
+                      Coming soon: invite people in ranked order with auto-promote on declines.
                     </p>
                   </div>
+                  <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                    Coming soon
+                  </span>
                 </div>
               </button>
 
@@ -517,21 +618,6 @@ export function CreateEvent({
                 />
                 {errors.inviteeEmail && <p className="text-red-500 text-sm mt-1">{errors.inviteeEmail}</p>}
               </div>
-              <div className="flex-1">
-                <input
-                  type="tel"
-                  value={newInviteePhone}
-                  onChange={(e) => setNewInviteePhone(e.target.value)}
-                  placeholder="Phone Number"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddInvitee();
-                    }
-                  }}
-                />
-              </div>
               <button
                 type="button"
                 onClick={handleAddInvitee}
@@ -671,90 +757,7 @@ export function CreateEvent({
             )}
           </div>
 
-          {/* Calendar Invite Options */}
-          <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-            <div className="flex items-start gap-3 mb-4">
-              <Calendar className="w-5 h-5 text-green-600 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-green-900 mb-1">
-                  📅 Calendar Invites
-                </h3>
-                <p className="text-sm text-gray-700 mb-4">
-                  Automatically send calendar invitations to selected recipients
-                </p>
-                
-                <div className="space-y-3">
-                  {/* Send to Organizer */}
-                  <label className="flex items-center gap-3 p-3 bg-white rounded-lg border border-green-200 hover:bg-green-50 cursor-pointer transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={sendOrganizerCalendarInvite}
-                      onChange={(e) => setSendOrganizerCalendarInvite(e.target.checked)}
-                      className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                    />
-                    <div className="flex-1">
-                      <span className="text-sm font-medium text-gray-900">
-                        Send me a calendar invite
-                      </span>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Add this event to your own calendar
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* Send to Invitees */}
-                  <label className="flex items-center gap-3 p-3 bg-white rounded-lg border border-green-200 hover:bg-green-50 cursor-pointer transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={sendInviteesCalendarInvite}
-                      onChange={(e) => setSendInviteesCalendarInvite(e.target.checked)}
-                      className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                    />
-                    <div className="flex-1">
-                      <span className="text-sm font-medium text-gray-900">
-                        Send invitees calendar invites
-                      </span>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Invitees will receive calendar invitations
-                      </p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SMS Notification Options */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <div className="flex items-start gap-3 mb-4">
-              <Phone className="w-5 h-5 text-blue-600 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-blue-900 mb-1">
-                  📱 SMS Notifications
-                </h3>
-                <p className="text-sm text-gray-700 mb-4">
-                  Send text message notifications to invitees with phone numbers
-                </p>
-                
-                <label className="flex items-center gap-3 p-3 bg-white rounded-lg border border-blue-200 hover:bg-blue-50 cursor-pointer transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={notifyByPhone}
-                    onChange={(e) => setNotifyByPhone(e.target.checked)}
-                    className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                  />
-                  <div className="flex-1">
-                    <span className="text-sm font-medium text-gray-900">
-                      Send SMS notifications to invitees
-                    </span>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Only invitees with phone numbers will receive SMS alerts
-                    </p>
-                  </div>
-                </label>
-              </div>
-            </div>
-          </div>
+          {/* SMS Notification Options (hidden for MVP) */}
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">

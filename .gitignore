@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.env.*
+supabase/.env
+supabase/.env.local
+.vercel
+.DS_Store
+*.DS_Store
+**/.DS_Store
+supabase/.temp

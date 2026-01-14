@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, LogOut, Plus, User, X, Filter, Users } from 'lucide-react';
+import { Calendar, LogOut, Plus, User, X, Filter, Users, Settings } from 'lucide-react';
 import { CreateEvent } from './create-event';
 import { EventList } from './event-list';
 import { ContactList } from './contact-list';
@@ -15,10 +15,11 @@ interface DashboardProps {
 }
 
 export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
-  const [view, setView] = useState<'list' | 'create' | 'contacts'>('list');
+  const [view, setView] = useState<'list' | 'create' | 'contacts' | 'settings'>('list');
   const [events, setEvents] = useState<Event[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
+  const [timeZone, setTimeZone] = useState<string>(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedQuickFilter, setSelectedQuickFilter] = useState<'all' | 'today' | 'tomorrow' | 'week' | 'past'>('all');
   const [startDate, setStartDate] = useState<string>('');
@@ -63,6 +64,8 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
       date: rawEvent.date,
       time: rawEvent.time,
       location: rawEvent.location || '',
+      timeZone: rawEvent.time_zone || rawEvent.timeZone || timeZone,
+      durationMinutes: rawEvent.duration_minutes ?? rawEvent.durationMinutes ?? 60,
       organizer: rawEvent.organizer || { email: user.email, name: user.name },
       invitees,
       inviteMode: rawEvent.inviteMode || 'priority',
@@ -81,6 +84,12 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
     fetchEvents();
     fetchContacts();
     testBackendConnection();
+
+    // Refresh timezone from browser (approx IP/device derived)
+    const detectedZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (detectedZone) {
+      setTimeZone(detectedZone);
+    }
   }, []);
 
   // Test backend connectivity
@@ -517,6 +526,15 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                 </div>
               </div>
               <button
+                onClick={() => setView('settings')}
+                className={`p-2 rounded-lg transition-colors ${
+                  view === 'settings' ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-100 text-gray-700'
+                }`}
+                title="Settings"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+              <button
                 onClick={onLogout}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Logout"
@@ -873,14 +891,65 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
           <CreateEvent
             currentUser={user}
             contacts={contacts}
+            timeZone={timeZone}
             onCreateEvent={handleCreateEvent}
             onCancel={() => setView('list')}
           />
-        ) : (
+        ) : view === 'contacts' ? (
           <ContactList
             contacts={contacts}
             onDeleteContact={handleDeleteContact}
           />
+        ) : (
+          <div className="max-w-4xl mx-auto bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-6">
+            <div className="flex items-center gap-3">
+              <Settings className="w-5 h-5 text-indigo-600" />
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Settings</h2>
+                <p className="text-sm text-gray-600">Manage your account and defaults.</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Profile</p>
+                <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                <p className="text-xs text-gray-600">{user.email}</p>
+              </div>
+
+              <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Default Invite Mode</p>
+                <p className="text-sm text-gray-900">First-Come-First-Serve</p>
+                <p className="text-xs text-gray-600">Priority mode is coming soon.</p>
+              </div>
+            </div>
+
+            <div className="p-4 border border-gray-200 rounded-lg">
+              <p className="text-sm font-semibold text-gray-900 mb-2">Timezone</p>
+              <p className="text-xs text-gray-600 mb-3">Detected from your device/IP. Adjust if needed.</p>
+              <select
+                value={timeZone}
+                onChange={(e) => setTimeZone(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+              >
+                {['UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Singapore', 'Asia/Tokyo', 'Australia/Sydney'].map((tz) => (
+                  <option key={tz} value={tz}>{tz}</option>
+                ))}
+                {!['UTC','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Europe/London','Europe/Paris','Asia/Singapore','Asia/Tokyo','Australia/Sydney'].includes(timeZone) && (
+                  <option value={timeZone}>{timeZone}</option>
+                )}
+              </select>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setView('list')}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
+              >
+                Back to events
+              </button>
+            </div>
+          </div>
         )}
       </main>
     </div>

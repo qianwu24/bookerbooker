@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Invitation</title>
+    <style>
+      body { font-family: Arial, sans-serif; background: #f7f7f8; color: #0f172a; }
+      .container { max-width: 520px; margin: 0 auto; background: #ffffff; padding: 24px; border-radius: 12px; }
+      .btn { display: inline-block; padding: 12px 18px; border-radius: 8px; font-weight: 600; text-decoration: none; }
+      .confirm { background: #0f766e; color: #ffffff; }
+      .decline { background: #e11d48; color: #ffffff; }
+      .muted { color: #64748b; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <p style="font-weight:700; font-size:18px; margin:0 0 12px;">You are invited</p>
+      <p style="margin:0 0 12px;">Hi {{{invitee_name}}},</p>
+      <p style="margin:0 0 12px;">
+        {{{host_name}}} invited you to <strong>{{{event_title}}}</strong>
+        on <strong>{{{event_date}}}</strong> at <strong>{{{event_time}}}</strong>.
+      </p>
+      <p style="margin:0 0 18px;">Please confirm or decline:</p>
+      <div style="margin:0 0 16px;">
+        <a class="btn confirm" href="{{{confirm_url}}}">Confirm attendance</a>
+        <a class="btn decline" href="{{{decline_url}}}" style="margin-left:8px;">Decline</a>
+      </div>
+      <p class="muted" style="margin:0 0 8px;">Location: {{{event_location}}}</p>
+      <p class="muted" style="margin:0 0 16px;">Notes: {{{event_notes}}}</p>
+      <p class="muted">If the buttons do not work, copy these links:</p>
+      <p class="muted" style="word-break:break-all;">Confirm: {{{confirm_url}}}</p>
+      <p class="muted" style="word-break:break-all;">Decline: {{{decline_url}}}</p>
+      <p class="muted" style="margin-top:16px;">Sent by Booker · {{{org_name}}}</p>
+    </div>
+  </body>
+</html>

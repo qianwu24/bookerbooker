@@ -28,37 +28,238 @@ const getServiceClient = () => createClient(
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const RESEND_FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL');
+const RESEND_TEMPLATE_ID = Deno.env.get('RESEND_TEMPLATE_ID');
+const APP_BASE_URL = Deno.env.get('APP_BASE_URL') || 'https://bookerbooker.com';
+const RSVP_SECRET = Deno.env.get('RSVP_SECRET') || 'dev-secret-change-me';
+const DEFAULT_AUTO_PROMOTE_MINUTES = 30;
 
 type InviteePayload = {
   email: string;
   name?: string;
 };
 
+type EventEmailPayload = {
+  title: string;
+  date: string;
+  time: string;
+  location?: string;
+  timeZone?: string;
+  durationMinutes?: number;
+  organizerName?: string;
+  notes?: string;
+  confirmUrl?: string;
+  declineUrl?: string;
+  orgName?: string;
+  icsContent?: string;
+};
+
+type EmailAttachment = {
+  filename: string;
+  content: string; // base64
+  path?: string;
+};
+
+// --- RSVP token helpers ---
+const textEncoder = new TextEncoder();
+
+const padTime = (isoLike: string) => {
+  // Ensure we have seconds; if time is HH:MM, append :00
+  if (/^\d{2}:\d{2}$/.test(isoLike)) return `${isoLike}:00`;
+  return isoLike;
+};
+
+const formatIcsDate = (iso: string) => iso.replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+
+const buildIcs = (event: {
+  id: string;
+  title: string;
+  description?: string;
+  location?: string;
+  date: string;
+  time: string;
+  durationMinutes?: number;
+  organizerEmail: string;
+  attendeeEmail?: string;
+}) => {
+  const startIso = new Date(`${event.date}T${padTime(event.time)}Z`).toISOString();
+  const duration = event.durationMinutes ?? 60;
+  const endIso = new Date(new Date(startIso).getTime() + duration * 60_000).toISOString();
+  const dtStamp = formatIcsDate(new Date().toISOString());
+  const dtStart = formatIcsDate(startIso);
+  const dtEnd = formatIcsDate(endIso);
+  const uid = `${event.id}@bookerbooker.com`;
+
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Booker//EN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${dtStamp}`,
+    `DTSTART:${dtStart}`,
+    `DTEND:${dtEnd}`,
+    `SUMMARY:${event.title}`,
+    `DESCRIPTION:${event.description || ''}`,
+    `LOCATION:${event.location || ''}`,
+    `ORGANIZER:mailto:${event.organizerEmail}`,
+    event.attendeeEmail ? `ATTENDEE;CN=${event.attendeeEmail}:mailto:${event.attendeeEmail}` : '',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].filter(Boolean).join('\r\n');
+
+  const content = btoa(lines);
+  return { filename: 'event.ics', content } as EmailAttachment;
+};
+
+const base64UrlEncode = (bytes: Uint8Array) => {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+};
+
+const signData = async (data: string): Promise<string> => {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    textEncoder.encode(RSVP_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, textEncoder.encode(data));
+  return base64UrlEncode(new Uint8Array(sig));
+};
+
+const createRsvpToken = async (payload: { eventId: string; inviteeEmail: string; action: 'confirm' | 'decline'; exp: number; }) => {
+  const json = JSON.stringify(payload);
+  const payloadB64 = base64UrlEncode(textEncoder.encode(json));
+  const sig = await signData(payloadB64);
+  return `${payloadB64}.${sig}`;
+};
+
+const verifyRsvpToken = async (token: string) => {
+  const [payloadB64, sig] = token.split('.');
+  if (!payloadB64 || !sig) return null;
+  const expectedSig = await signData(payloadB64);
+  if (expectedSig !== sig) return null;
+  const json = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'));
+  const payload = JSON.parse(json);
+  if (!payload?.exp || Date.now() > payload.exp) return null;
+  return payload as { eventId: string; inviteeEmail: string; action: 'confirm' | 'decline'; exp: number; };
+};
+
+const buildRsvpUrls = async (eventId: string, inviteeEmail: string) => {
+  const exp = Date.now() + 1000 * 60 * 60 * 24 * 7; // 7 days
+  const confirmToken = await createRsvpToken({ eventId, inviteeEmail, action: 'confirm', exp });
+  const declineToken = await createRsvpToken({ eventId, inviteeEmail, action: 'decline', exp });
+  return {
+    confirmUrl: `${APP_BASE_URL}/rsvp?token=${confirmToken}`,
+    declineUrl: `${APP_BASE_URL}/rsvp?token=${declineToken}`,
+  };
+};
+
 const sendInviteEmail = async (
   invitee: InviteePayload,
-  event: { title: string; date: string; time: string; location?: string; organizerName?: string },
-) => {
+  event: EventEmailPayload,
+): Promise<boolean> => {
   if (!RESEND_API_KEY || !RESEND_FROM_EMAIL) {
     console.log('Email not sent: RESEND_API_KEY or RESEND_FROM_EMAIL not configured');
-    return;
+    return false;
   }
 
   try {
     const subject = `You're invited: ${event.title}`;
-    const bodyText = `Hi ${invitee.name || invitee.email},\n\nYou're invited to "${event.title}".\nDate: ${event.date}\nTime: ${event.time}\nLocation: ${event.location || 'TBD'}\nOrganizer: ${event.organizerName || 'Organizer'}\n\nPlease respond at your earliest convenience.`;
+
+    const durationText = event.durationMinutes
+      ? `${event.durationMinutes} minute${event.durationMinutes === 1 ? '' : 's'}`
+      : 'Not specified';
+    const tzText = event.timeZone || 'UTC';
+
+    // If template is configured, send using the template with variables; otherwise fall back to inline HTML/text.
+    const templateVariables = {
+      invitee_name: invitee.name || invitee.email,
+      host_name: event.organizerName || 'Organizer',
+      event_title: event.title,
+      event_date: event.date,
+      event_time: event.time,
+      event_location: event.location || 'TBD',
+      event_time_zone: tzText,
+      event_duration: durationText,
+      event_notes: event.notes || '—',
+      confirm_url: event.confirmUrl || 'https://bookerbooker.com/confirm',
+      decline_url: event.declineUrl || 'https://bookerbooker.com/decline',
+      org_name: event.orgName || 'Booker',
+    };
+
+    const bodyText = [
+      `Hi ${templateVariables.invitee_name}`,
+      '',
+      `${templateVariables.host_name} invited you to ${templateVariables.event_title}.`,
+      `Date: ${templateVariables.event_date}`,
+      `Time: ${templateVariables.event_time} (${templateVariables.event_time_zone})`,
+      `Duration: ${templateVariables.event_duration}`,
+      `Location: ${templateVariables.event_location}`,
+      `Organizer: ${templateVariables.host_name}`,
+      `Notes: ${templateVariables.event_notes}`,
+      '',
+      'RSVP:',
+      `Confirm: ${templateVariables.confirm_url}`,
+      `Decline: ${templateVariables.decline_url}`,
+      '',
+      `Sent by ${templateVariables.org_name}`,
+    ].join('\n');
+
     const bodyHtml = `
-      <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;">
-        <h2>You're invited: ${event.title}</h2>
-        <p>Hi ${invitee.name || invitee.email},</p>
-        <p>You're invited to <strong>${event.title}</strong>.</p>
-        <ul>
-          <li><strong>Date:</strong> ${event.date}</li>
-          <li><strong>Time:</strong> ${event.time}</li>
-          <li><strong>Location:</strong> ${event.location || 'TBD'}</li>
-          <li><strong>Organizer:</strong> ${event.organizerName || 'Organizer'}</li>
+      <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px; color:#0f172a;">
+        <h2 style="margin:0 0 12px 0;">You're invited: ${templateVariables.event_title}</h2>
+        <p style="margin:0 0 12px 0;">Hi ${templateVariables.invitee_name},</p>
+        <p style="margin:0 0 14px 0;">${templateVariables.host_name} invited you to <strong>${templateVariables.event_title}</strong>.</p>
+        <p style="margin:0 0 10px 0; font-weight:600;">Quick RSVP</p>
+        <table role="presentation" cellspacing="0" cellpadding="0" style="border-collapse:separate; border-spacing:0 10px; margin:0 0 12px 0;">
+          <tr>
+            <td>
+              <a href="${templateVariables.confirm_url}" style="display:block; padding:12px 16px; background:#16a34a; color:#ffffff; text-decoration:none; border-radius:10px; font-weight:700; text-align:center;">Confirm attendance</a>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <a href="${templateVariables.decline_url}" style="display:block; padding:12px 16px; background:#dc2626; color:#ffffff; text-decoration:none; border-radius:10px; font-weight:700; text-align:center;">Decline</a>
+            </td>
+          </tr>
+        </table>
+        <p style="margin:0 0 12px 0;">Event details:</p>
+        <ul style="padding-left:18px; margin:0 0 16px 0; line-height:1.4;">
+          <li><strong>Date:</strong> ${templateVariables.event_date}</li>
+          <li><strong>Time:</strong> ${templateVariables.event_time} (${templateVariables.event_time_zone})</li>
+          <li><strong>Duration:</strong> ${templateVariables.event_duration}</li>
+          <li><strong>Location:</strong> ${templateVariables.event_location}</li>
+          <li><strong>Organizer:</strong> ${templateVariables.host_name}</li>
         </ul>
-        <p>Please respond at your earliest convenience.</p>
+        <p style="margin:0 0 16px 0;">Notes: ${templateVariables.event_notes}</p>
+        <p style="margin:0; font-size:12px; color:#475569;">If you do not see the buttons, copy these links:<br />Confirm: ${templateVariables.confirm_url}<br />Decline: ${templateVariables.decline_url}</p>
       </div>`;
+
+    const attachments: EmailAttachment[] = [];
+    if (event.icsContent) {
+      attachments.push({ filename: 'event.ics', content: event.icsContent });
+    }
+
+    const payload: Record<string, unknown> = {
+      from: RESEND_FROM_EMAIL,
+      to: [invitee.email],
+      subject,
+      text: bodyText,
+      html: bodyHtml,
+      attachments: attachments.length ? attachments : undefined,
+    };
+
+    console.log('Sending via Resend inline', {
+      to: invitee.email,
+      subject,
+      data: templateVariables,
+      hasIcs: attachments.length > 0,
+    });
 
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -66,21 +267,20 @@ const sendInviteEmail = async (
         'Content-Type': 'application/json',
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
-      body: JSON.stringify({
-        from: RESEND_FROM_EMAIL,
-        to: [invitee.email],
-        subject,
-        text: bodyText,
-        html: bodyHtml,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
       const errText = await res.text();
-      console.log('Resend email failed:', errText);
+      console.log('Resend email failed:', res.status, res.statusText, errText);
+      return false;
     }
+
+    console.log('Resend email sent to invitee:', invitee.email);
+    return true;
   } catch (error) {
     console.log('Error sending invite email:', error);
+    return false;
   }
 };
 
@@ -93,20 +293,249 @@ async function getAuthenticatedUser(authHeader: string | null) {
   
   const accessToken = authHeader.split(' ')[1];
   const supabase = getServiceClient();
-  
-  const { data: { user }, error } = await supabase.auth.getUser(accessToken);
-  if (error || !user) {
-    console.log('Authentication error:', error?.message);
+
+  try {
+    const { data, error } = await supabase.auth.getUser(accessToken);
+    if (error || !data?.user) {
+      console.log('Failed to validate user with Supabase auth', error?.message);
+      return null;
+    }
+
+    const { user } = data;
+    console.log('User authenticated:', user.email);
+    return { user, accessToken };
+  } catch (err) {
+    console.log('Error validating user token:', err);
     return null;
   }
-  
-  console.log('User authenticated:', user.email);
-  return { user, accessToken };
 }
 
 // Health check endpoint
 app.get("/make-server-37f8437f/health", (c) => {
   return c.json({ status: "ok" });
+});
+
+// RSVP endpoint (GET /rsvp?token=...)
+app.get("/make-server-37f8437f/rsvp", async (c) => {
+  const token = c.req.query('token');
+  if (!token) {
+    return c.json({ error: 'Missing token' }, 400);
+  }
+
+  const payload = await verifyRsvpToken(token);
+  if (!payload) {
+    return c.json({ error: 'Invalid or expired token' }, 400);
+  }
+
+  const { eventId, inviteeEmail, action } = payload;
+  const supabase = getServiceClient();
+
+  // Update invitee status
+  const { data: invitee, error: inviteeError } = await supabase
+    .from('invitees')
+    .select('*')
+    .eq('event_id', eventId)
+    .eq('email', inviteeEmail)
+    .single();
+
+  if (inviteeError || !invitee) {
+    return c.json({ error: 'Invitee not found' }, 404);
+  }
+
+  const newStatus = action === 'confirm' ? 'confirmed' : 'declined';
+
+  const { error: updateError } = await supabase
+    .from('invitees')
+    .update({ status: newStatus, updated_at: new Date().toISOString() })
+    .eq('event_id', eventId)
+    .eq('email', inviteeEmail);
+
+  if (updateError) {
+    return c.json({ error: updateError.message }, 400);
+  }
+
+  // Fetch event details for follow-up
+  const { data: event } = await supabase
+    .from('events')
+    .select(`
+      *,
+      organizer:users!events_organizer_id_fkey(id, email, name)
+    `)
+    .eq('id', eventId)
+    .single();
+
+  // Send confirmation email to invitee on confirm
+  if (newStatus === 'confirmed' && event) {
+    const ics = buildIcs({
+      id: eventId,
+      title: event.title,
+      description: event.description,
+      location: event.location,
+      date: event.date,
+      time: event.time,
+      durationMinutes: event.duration_minutes,
+      organizerEmail: event.organizer?.email || '',
+      attendeeEmail: inviteeEmail,
+    });
+
+    await sendInviteEmail(
+      { email: inviteeEmail, name: invitee?.name },
+      {
+        title: event.title,
+        date: event.date,
+        time: event.time,
+        location: event.location,
+        timeZone: event.time_zone,
+        durationMinutes: event.duration_minutes,
+        organizerName: event.organizer?.name,
+        notes: event.description || '—',
+        orgName: event.organizer?.name || 'Booker',
+        confirmUrl: `${APP_BASE_URL}/events/${eventId}`,
+        declineUrl: `${APP_BASE_URL}/events/${eventId}`,
+        icsContent: ics.content,
+      },
+    );
+  }
+
+  // If declined, promote next pending invitee
+  if (newStatus === 'declined') {
+    const { data: nextInvitee } = await supabase
+      .from('invitees')
+      .select('*')
+      .eq('event_id', eventId)
+      .eq('status', 'pending')
+      .gt('priority', invitee.priority)
+      .order('priority', { ascending: true })
+      .limit(1)
+      .single();
+
+    if (nextInvitee) {
+      await supabase
+        .from('invitees')
+        .update({
+          status: 'invited',
+          invited_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', nextInvitee.id);
+
+      // Send invite to promoted
+      await sendInviteEmail(
+        { email: nextInvitee.email, name: nextInvitee.name },
+        {
+          title: invitee.title || 'Event Invitation',
+          date: invitee.date || '',
+          time: invitee.time || '',
+          location: invitee.location,
+          timeZone: event?.time_zone,
+          durationMinutes: event?.duration_minutes,
+          organizerName: invitee.organizerName,
+          notes: invitee.notes || '—',
+          orgName: invitee.organizerName || 'Booker',
+          confirmUrl: (await buildRsvpUrls(eventId, nextInvitee.email)).confirmUrl,
+          declineUrl: (await buildRsvpUrls(eventId, nextInvitee.email)).declineUrl,
+        },
+      );
+    }
+  }
+
+  const message = newStatus === 'confirmed'
+    ? 'Thanks! Your attendance is confirmed.'
+    : 'You have declined the invitation.';
+
+  return c.html(`<!doctype html><html><body><h2>${message}</h2><p>You can close this window.</p></body></html>`);
+});
+
+// Scheduled endpoint to auto-promote when invited users don't respond in time
+app.get("/make-server-37f8437f/cron/auto-promote", async (c) => {
+  const supabase = getServiceClient();
+  const now = new Date();
+
+  const { data: events, error } = await supabase
+    .from('events')
+    .select(`
+      id,
+      title,
+      description,
+      date,
+      time,
+      duration_minutes,
+      location,
+      invite_mode,
+      auto_promote_after_minutes,
+      organizer:users!events_organizer_id_fkey(email, name),
+      invitees:invitees(id, email, name, status, priority, invited_at)
+    `);
+
+  if (error || !events) {
+    console.log('Auto-promote fetch error:', error);
+    return c.json({ promoted: 0, error: error?.message || 'Fetch failed' }, 500);
+  }
+
+  let promoted = 0;
+
+  for (const event of events) {
+    const hasConfirmed = event.invitees.some((inv: any) => inv.status === 'confirmed' || inv.status === 'accepted');
+    if (hasConfirmed) continue;
+
+    const thresholdMinutes = event.auto_promote_after_minutes ?? DEFAULT_AUTO_PROMOTE_MINUTES;
+    const cutoff = now.getTime() - thresholdMinutes * 60_000;
+
+    const staleInvited = event.invitees.filter((inv: any) => inv.status === 'invited' && inv.invited_at && new Date(inv.invited_at).getTime() <= cutoff);
+    if (staleInvited.length === 0) continue;
+
+    const nextPending = event.invitees
+      .filter((inv: any) => inv.status === 'pending')
+      .sort((a: any, b: any) => a.priority - b.priority)[0];
+
+    if (!nextPending) continue;
+
+    const nowIso = now.toISOString();
+
+    // Expire stale invited users
+    const staleIds = staleInvited.map((inv: any) => inv.id);
+    if (staleIds.length > 0) {
+      await supabase
+        .from('invitees')
+        .update({ status: 'declined', updated_at: nowIso })
+        .in('id', staleIds);
+    }
+
+    // Promote next pending
+    const { error: promoteError } = await supabase
+      .from('invitees')
+      .update({ status: 'invited', invited_at: nowIso, updated_at: nowIso })
+      .eq('id', nextPending.id);
+
+    if (promoteError) {
+      console.log('Auto-promote update error:', promoteError);
+      continue;
+    }
+
+    // Send invite to promoted user
+    const urls = await buildRsvpUrls(event.id, nextPending.email);
+
+    await sendInviteEmail(
+      { email: nextPending.email, name: nextPending.name },
+      {
+        title: event.title,
+        date: event.date,
+        time: event.time,
+        location: event.location,
+        timeZone: event.time_zone,
+        durationMinutes: event.duration_minutes,
+        organizerName: event.organizer?.name,
+        notes: event.description || '—',
+        orgName: event.organizer?.name || 'Booker',
+        confirmUrl: urls.confirmUrl,
+        declineUrl: urls.declineUrl,
+      },
+    );
+
+    promoted += 1;
+  }
+
+  return c.json({ promoted });
 });
 
 // Sign up endpoint - creates user in auth and profile
@@ -163,6 +592,10 @@ app.post("/make-server-37f8437f/events", async (c) => {
         date: eventData.date,
         time: eventData.time,
         location: eventData.location,
+        time_zone: eventData.timeZone || null,
+        duration_minutes: eventData.durationMinutes ?? null,
+        invite_mode: eventData.inviteMode || 'priority',
+        auto_promote_after_minutes: eventData.autoPromoteInterval ?? 30,
         organizer_id: user.id,
       })
       .select()
@@ -175,24 +608,41 @@ app.post("/make-server-37f8437f/events", async (c) => {
     
     // Add invitees
     const invitedNow: any[] = [];
+    const notices: string[] = [];
     if (eventData.invitees && eventData.invitees.length > 0) {
-      const inviteesData = eventData.invitees.map((invitee: any, index: number) => ({
-        event_id: event.id,
-        email: invitee.email,
-        name: invitee.name,
-        priority: invitee.priority ?? index,
-        status: index === 0 ? 'invited' : 'pending', // First person gets invited
-      }));
+      const isPriorityMode = eventData.inviteMode === 'priority';
+      const invitedAt = new Date().toISOString();
+
+      const inviteesData = eventData.invitees.map((invitee: any, index: number) => {
+        const status = isPriorityMode
+          ? (index === 0 ? 'invited' : 'pending')
+          : 'invited';
+
+        return {
+          event_id: event.id,
+          email: invitee.email,
+          name: invitee.name,
+          priority: invitee.priority ?? index,
+          status,
+          invited_at: status === 'invited' ? invitedAt : null,
+        };
+      });
       
-      const { error: inviteesError } = await supabase
+      const { data: upsertedInvitees, error: inviteesError } = await supabase
         .from('invitees')
-        .insert(inviteesData);
+        .upsert(inviteesData, { onConflict: 'event_id,email', ignoreDuplicates: false })
+        .select();
       
       if (inviteesError) {
         console.log('Error adding invitees:', inviteesError);
         // Don't fail the whole request, event was created
       } else {
-        invitedNow.push(...inviteesData.filter((i) => i.status === 'invited'));
+        const inviteSource = upsertedInvitees || inviteesData;
+        if (upsertedInvitees && upsertedInvitees.length < inviteesData.length) {
+          notices.push('Some invitees already existed for this event and were updated.');
+        }
+        // Send to everyone we just marked as invited (priority mode only sends the first one initially)
+        invitedNow.push(...inviteSource.filter((inv: any) => inv.status === 'invited'));
       }
     }
     
@@ -215,6 +665,10 @@ app.post("/make-server-37f8437f/events", async (c) => {
       date: fullEvent.date,
       time: fullEvent.time,
       location: fullEvent.location,
+      timeZone: fullEvent.time_zone || eventData.timeZone || null,
+      durationMinutes: fullEvent.duration_minutes ?? eventData.durationMinutes ?? null,
+      inviteMode: fullEvent.invite_mode || 'priority',
+      autoPromoteInterval: fullEvent.auto_promote_after_minutes ?? 30,
       organizer: {
         email: fullEvent.organizer.email,
         name: fullEvent.organizer.name,
@@ -224,25 +678,55 @@ app.post("/make-server-37f8437f/events", async (c) => {
         name: inv.name,
         priority: inv.priority,
         status: inv.status,
+        invitedAt: inv.invited_at,
       })),
       createdAt: fullEvent.created_at,
     };
+    const responseNotices = eventData.invitees && eventData.invitees.length > 0 ? notices : [];
 
-    // Send emails to invitees who are invited now
-    if (invitedNow.length > 0) {
-      const mailPayload = {
+    // Send creator confirmation (with ICS) and invitee invites
+    // Creator confirmation (no ICS on initial create)
+    await sendInviteEmail(
+      { email: responseEvent.organizer.email, name: responseEvent.organizer.name },
+      {
         title: responseEvent.title,
         date: responseEvent.date,
         time: responseEvent.time,
         location: responseEvent.location,
+        timeZone: responseEvent.timeZone,
+        durationMinutes: responseEvent.durationMinutes,
         organizerName: responseEvent.organizer.name,
-      };
-      for (const inv of invitedNow) {
-        sendInviteEmail({ email: inv.email, name: inv.name }, mailPayload);
-      }
+        notes: responseEvent.description || '—',
+        orgName: responseEvent.organizer.name || 'Booker',
+        confirmUrl: `${APP_BASE_URL}/events/${responseEvent.id}`,
+        declineUrl: `${APP_BASE_URL}/events/${responseEvent.id}`,
+      },
+    );
+
+    // Invitees
+    if (invitedNow.length > 0) {
+      await Promise.all(invitedNow.map(async (inv) => {
+        const urls = await buildRsvpUrls(responseEvent.id, inv.email);
+        await sendInviteEmail(
+          { email: inv.email, name: inv.name },
+          {
+            title: responseEvent.title,
+            date: responseEvent.date,
+            time: responseEvent.time,
+            location: responseEvent.location,
+            timeZone: responseEvent.timeZone,
+            durationMinutes: responseEvent.durationMinutes,
+            organizerName: responseEvent.organizer.name,
+            notes: responseEvent.description || '—',
+            orgName: responseEvent.organizer.name || 'Booker',
+            confirmUrl: urls.confirmUrl,
+            declineUrl: urls.declineUrl,
+          },
+        );
+      }));
     }
     
-    return c.json({ success: true, event: responseEvent });
+    return c.json({ success: true, event: responseEvent, notices: responseNotices });
   } catch (error) {
     console.log('Error creating event:', error);
     return c.json({ error: 'Internal server error' }, 500);
@@ -393,14 +877,20 @@ app.put("/make-server-37f8437f/events/:eventId/invitees/:inviteeEmail/status", a
           .eq('id', nextInvitee.id);
 
         // Send invite to the promoted invitee
-        sendInviteEmail(
+        await sendInviteEmail(
           { email: nextInvitee.email, name: nextInvitee.name },
           {
             title: event?.title || 'Event Invitation',
             date: event?.date || '',
             time: event?.time || '',
             location: event?.location,
+            timeZone: event?.time_zone,
+            durationMinutes: event?.duration_minutes,
             organizerName: event?.organizer?.name,
+            notes: event?.description || '—',
+            orgName: event?.organizer?.name || 'Booker',
+            confirmUrl: (await buildRsvpUrls(eventId, nextInvitee.email)).confirmUrl,
+            declineUrl: (await buildRsvpUrls(eventId, nextInvitee.email)).declineUrl,
           },
         );
       }

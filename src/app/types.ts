@@ -20,6 +20,8 @@ export interface Event {
   date: string;
   time: string;
   location: string;
+  timeZone?: string;
+  durationMinutes?: number;
   organizer: {
     email: string;
     name: string;
