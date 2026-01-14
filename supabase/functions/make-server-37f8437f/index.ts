@@ -346,7 +346,8 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
     return c.json({ error: 'Invitee not found' }, 404);
   }
 
-  const newStatus = action === 'confirm' ? 'confirmed' : 'declined';
+  // Database constraint allows: pending, invited, accepted, declined
+  const newStatus = action === 'confirm' ? 'accepted' : 'declined';
 
   const { error: updateError } = await supabase
     .from('invitees')
@@ -369,7 +370,7 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
     .single();
 
   // Send confirmation email to invitee on confirm
-  if (newStatus === 'confirmed' && event) {
+  if (newStatus === 'accepted' && event) {
     const ics = buildIcs({
       id: eventId,
       title: event.title,
@@ -443,7 +444,7 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
     }
   }
 
-  const message = newStatus === 'confirmed'
+  const message = newStatus === 'accepted'
     ? 'Thanks! Your attendance is confirmed.'
     : 'You have declined the invitation.';
 
