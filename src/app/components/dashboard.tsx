@@ -40,6 +40,9 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
   const [onlyScheduled, setOnlyScheduled] = useState(false);
   const [showClearNoShowDialog, setShowClearNoShowDialog] = useState(false);
   const [clearingNoShows, setClearingNoShows] = useState(false);
+  const [hasMoreEvents, setHasMoreEvents] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const EVENTS_PER_PAGE = 10;
 
   // Helper function to get fresh access token
   const getFreshToken = async () => {
@@ -117,13 +120,14 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
     }
   };
 
-  const fetchEvents = async () => {
+  const fetchEvents = async (reset = true) => {
     try {
-      console.log('📥 Fetching events...');
+      console.log('📥 Fetching events...', reset ? '(initial)' : '(more)');
       const freshToken = await getFreshToken();
       console.log('🔑 Using token for fetch:', freshToken.substring(0, 30) + '...');
       
-      const response = await fetch(`${API_BASE_URL}/events`, {
+      const offset = reset ? 0 : events.length;
+      const response = await fetch(`${API_BASE_URL}/events?limit=${EVENTS_PER_PAGE}&offset=${offset}`, {
         headers: {
           'Authorization': `Bearer ${freshToken}`,
         },
@@ -137,12 +141,25 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
 
       const data = await response.json();
       const normalized = (data.events || []).map((evt: any) => normalizeEvent(evt));
-      setEvents(normalized);
+      
+      if (reset) {
+        setEvents(normalized);
+      } else {
+        setEvents(prev => [...prev, ...normalized]);
+      }
+      setHasMoreEvents(data.hasMore ?? false);
     } catch (error) {
       console.error('Error fetching events:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const loadMoreEvents = async () => {
+    if (loadingMore || !hasMoreEvents) return;
+    setLoadingMore(true);
+    await fetchEvents(false);
   };
 
   const fetchContacts = async () => {
@@ -1085,6 +1102,9 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
             currentUser={user}
             onUpdateInviteeStatus={handleUpdateInviteeStatus}
             onCancelEvent={handleCancelEvent}
+            hasMore={hasMoreEvents}
+            loadingMore={loadingMore}
+            onLoadMore={loadMoreEvents}
           />
         ) : view === 'create' ? (
           <CreateEvent

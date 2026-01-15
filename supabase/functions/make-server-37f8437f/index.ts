@@ -1030,6 +1030,10 @@ app.get("/make-server-37f8437f/events", async (c) => {
     const { user } = auth;
     const supabase = getServiceClient();
     
+    // Parse pagination params
+    const limit = Math.min(parseInt(c.req.query('limit') || '10'), 50); // max 50
+    const offset = parseInt(c.req.query('offset') || '0');
+    
     // Get events organized by user
     const { data: organizedEvents, error: orgError } = await supabase
       .from('events')
@@ -1081,8 +1085,19 @@ app.get("/make-server-37f8437f/events", async (c) => {
     const allEvents = [...(organizedEvents || []), ...invitedEvents];
     const uniqueEvents = Array.from(new Map(allEvents.map(e => [e.id, e])).values());
     
+    // Sort by created_at descending (newest first)
+    uniqueEvents.sort((a: any, b: any) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    
+    // Get total count before pagination
+    const totalCount = uniqueEvents.length;
+    
+    // Apply pagination
+    const paginatedEvents = uniqueEvents.slice(offset, offset + limit);
+    
     // Transform to match frontend expected format
-    const events = uniqueEvents.map((event: any) => ({
+    const events = paginatedEvents.map((event: any) => ({
       id: event.id,
       title: event.title,
       description: event.description,
@@ -1106,8 +1121,9 @@ app.get("/make-server-37f8437f/events", async (c) => {
       createdAt: event.created_at,
     }));
     
-    console.log(`Returning ${events.length} events`);
-    return c.json({ events });
+    const hasMore = offset + limit < totalCount;
+    console.log(`Returning ${events.length} of ${totalCount} events (offset: ${offset}, hasMore: ${hasMore})`);
+    return c.json({ events, totalCount, hasMore });
   } catch (error) {
     console.log('Error fetching events:', error);
     return c.json({ error: 'Internal server error' }, 500);
