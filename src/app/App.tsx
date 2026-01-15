@@ -18,7 +18,7 @@ export default function App() {
   } | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState<'home' | 'login'>('home');
+  const [currentPage, setCurrentPage] = useState<'home' | 'login' | 'beta'>('home');
 
   useEffect(() => {
     // Check for existing session
@@ -107,10 +107,14 @@ export default function App() {
     );
   }
 
-  // Show beta gate if beta mode is enabled and user doesn't have access
-  if (BETA_MODE_ENABLED && !hasAccess) {
-    return <BetaGate onAccessGranted={grantAccess} />;
-  }
+  // Handle sign in - check beta access first if beta mode is enabled
+  const handleSignIn = () => {
+    if (BETA_MODE_ENABLED && !hasAccess) {
+      setCurrentPage('beta');
+    } else {
+      setCurrentPage('login');
+    }
+  };
 
   return (
     <div className="size-full">
@@ -118,8 +122,13 @@ export default function App() {
         <Dashboard user={user} accessToken={accessToken} onLogout={handleLogout} />
       ) : currentPage === 'login' ? (
         <LoginScreen onBack={() => setCurrentPage('home')} />
+      ) : currentPage === 'beta' ? (
+        <BetaGate onAccessGranted={() => {
+          grantAccess();
+          setCurrentPage('login');
+        }} />
       ) : (
-        <HomePage onSignIn={() => setCurrentPage('login')} />
+        <HomePage onSignIn={handleSignIn} />
       )}
     </div>
   );
