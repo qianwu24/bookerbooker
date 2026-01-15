@@ -28,6 +28,7 @@ const getServiceClient = () => createClient(
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const RESEND_FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL');
+const RESEND_CONFIRM_FROM_EMAIL = Deno.env.get('RESEND_CONFIRM_FROM_EMAIL'); // Optional: separate sender for confirmations
 const RESEND_TEMPLATE_ID = Deno.env.get('RESEND_TEMPLATE_ID');
 const RESEND_CONFIRM_TEMPLATE_ID = Deno.env.get('RESEND_CONFIRM_TEMPLATE_ID');
 const APP_BASE_URL = Deno.env.get('APP_BASE_URL') || 'https://bookerbooker.com';
@@ -91,17 +92,20 @@ const buildIcs = (event: {
   location?: string;
   date: string;
   time: string;
+  timeZone?: string;
   durationMinutes?: number;
   organizerEmail: string;
   attendeeEmail?: string;
 }) => {
-  const startIso = new Date(`${event.date}T${padTime(event.time)}Z`).toISOString();
+  // Format date/time as local time (no Z suffix) so calendar apps interpret in the given timezone
+  const localDateTime = `${event.date.replace(/-/g, '')}T${padTime(event.time).replace(/:/g, '')}`;
   const duration = event.durationMinutes ?? 60;
-  const endIso = new Date(new Date(startIso).getTime() + duration * 60_000).toISOString();
+  const startDate = new Date(`${event.date}T${padTime(event.time)}`);
+  const endDate = new Date(startDate.getTime() + duration * 60_000);
+  const endDateTime = `${endDate.getFullYear()}${String(endDate.getMonth() + 1).padStart(2, '0')}${String(endDate.getDate()).padStart(2, '0')}T${String(endDate.getHours()).padStart(2, '0')}${String(endDate.getMinutes()).padStart(2, '0')}${String(endDate.getSeconds()).padStart(2, '0')}`;
   const dtStamp = formatIcsDate(new Date().toISOString());
-  const dtStart = formatIcsDate(startIso);
-  const dtEnd = formatIcsDate(endIso);
   const uid = `${event.id}@bookerbooker.com`;
+  const tzid = event.timeZone || 'UTC';
 
   const lines = [
     'BEGIN:VCALENDAR',
@@ -111,8 +115,8 @@ const buildIcs = (event: {
     'BEGIN:VEVENT',
     `UID:${uid}`,
     `DTSTAMP:${dtStamp}`,
-    `DTSTART:${dtStart}`,
-    `DTEND:${dtEnd}`,
+    `DTSTART;TZID=${tzid}:${localDateTime}`,
+    `DTEND;TZID=${tzid}:${endDateTime}`,
     `SUMMARY:${event.title}`,
     `DESCRIPTION:${event.description || ''}`,
     `LOCATION:${event.location || ''}`,
@@ -346,10 +350,13 @@ const sendInviteEmail = async (
       attachments.push({ filename: 'event.ics', content: event.icsContent });
     }
 
-    const templateId = variant === 'invite' ? RESEND_TEMPLATE_ID : RESEND_CONFIRM_TEMPLATE_ID;
+    // Use different sender for confirmation emails if configured
+    const fromEmail = (variant === 'confirm' && RESEND_CONFIRM_FROM_EMAIL)
+      ? RESEND_CONFIRM_FROM_EMAIL
+      : RESEND_FROM_EMAIL;
 
     const payload: Record<string, unknown> = {
-      from: RESEND_FROM_EMAIL,
+      from: fromEmail,
       to: [invitee.email],
       subject,
       text: bodyText,
@@ -359,6 +366,7 @@ const sendInviteEmail = async (
 
     console.log('Sending via Resend', {
       to: invitee.email,
+      from: fromEmail,
       subject,
       variant,
       hasIcs: attachments.length > 0,
@@ -477,6 +485,7 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
       location: event.location,
       date: event.date,
       time: event.time,
+      timeZone: event.time_zone,
       durationMinutes: event.duration_minutes,
       organizerEmail: event.organizer?.email || '',
       attendeeEmail: inviteeEmail,
