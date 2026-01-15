@@ -190,9 +190,9 @@ const buildResultPage = (options: {
   } = options;
 
   const eventBlock = eventTitle || eventWhen
-    ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin:16px 0;">
-         ${eventTitle ? `<div style="font-weight:700;color:#0f172a;">${eventTitle}</div>` : ''}
-         ${eventWhen ? `<div style="color:#475569;margin-top:4px;">${eventWhen}</div>` : ''}
+    ? `<div style="background:#0f172a08;border:1px solid #e5e7eb;border-radius:14px;padding:14px 16px;margin:18px 0;">
+         ${eventTitle ? `<div style="font-weight:700;color:#0f172a;font-size:16px;">${eventTitle}</div>` : ''}
+         ${eventWhen ? `<div style="color:#475569;margin-top:6px;font-size:14px;">${eventWhen}</div>` : ''}
        </div>`
     : '';
 
@@ -203,19 +203,22 @@ const buildResultPage = (options: {
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>${title}</title>
     </head>
-    <body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;background:#0f172a;color:#0b1220;">
-      <div style="max-width:520px;margin:48px auto;background:#ffffff;border-radius:12px;padding:28px;box-shadow:0 10px 30px rgba(15,23,42,0.18);">
-        <div style="text-align:center;margin-bottom:12px;">
-          <div style="display:inline-flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:999px;background:${accentColor};color:#ffffff;font-weight:700;">${badge}</div>
+    <body style="margin:0;padding:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f8fafc;color:#0f172a;">
+      <div style="max-width:560px;margin:48px auto;background:#ffffff;border-radius:16px;padding:28px;box-shadow:0 20px 60px rgba(15,23,42,0.10);border:1px solid #e5e7eb;">
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;">
+          <div style="width:46px;height:46px;border-radius:12px;background:${accentColor};display:inline-flex;align-items:center;justify-content:center;color:#ffffff;font-weight:700;font-size:16px;box-shadow:0 10px 25px ${accentColor}33;">${badge}</div>
+          <div>
+            <div style="font-size:14px;color:#6b7280;">RSVP</div>
+            <h1 style="margin:2px 0 0 0;font-size:22px;color:#0f172a;">${title}</h1>
+          </div>
         </div>
-        <h2 style="margin:0 0 10px 0;font-size:22px;text-align:center;color:#0f172a;">${title}</h2>
-        <p style="margin:0 0 14px 0;text-align:center;color:#475569;">${detail}</p>
+        <p style="margin:0 0 16px 0;font-size:15px;color:#374151;">${detail}</p>
         ${eventBlock}
-        <div style="text-align:center;">
-          <a href="${APP_BASE_URL}" style="display:inline-block;padding:12px 16px;border-radius:10px;background:#4f46e5;color:#ffffff;text-decoration:none;font-weight:700;">Return to Booker</a>
+        <div style="margin-top:18px;text-align:center;">
+          <a href="${APP_BASE_URL}" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#4f46e5;color:#ffffff;text-decoration:none;font-weight:700;box-shadow:0 12px 30px rgba(79,70,229,0.25);">Return to Booker</a>
         </div>
       </div>
-      <p style="text-align:center;color:#cbd5e1;font-size:12px;margin-top:12px;">You can close this tab.</p>
+      <p style="text-align:center;color:#9ca3af;font-size:12px;margin-top:12px;">You can close this tab.</p>
     </body>
   </html>`;
 };
