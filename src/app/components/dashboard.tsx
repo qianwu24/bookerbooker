@@ -137,34 +137,43 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
     try {
       console.log('📒 Fetching contacts...');
       
-      // Fetch contacts with their invite counts
-      const { data, error } = await supabase
+      // Fetch contacts separately (avoid nested select that causes RLS recursion)
+      const { data: contactsData, error: contactsError } = await supabase
         .from('contacts')
-        .select(`
-          *,
-          event_invitees (
-            id,
-            invited_at
-          )
-        `)
+        .select('*')
         .eq('owner_id', user.id);
 
-      if (error) {
-        console.error('Error fetching contacts:', error.message);
+      if (contactsError) {
+        console.error('Error fetching contacts:', contactsError.message);
         return;
       }
 
-      const mapped = (data || []).map((c: any) => {
-        const invites = c.event_invitees || [];
-        const eventCount = invites.length;
-        // Find the most recent invite
-        const lastInvitedAt = invites.length > 0
-          ? invites.reduce((latest: string | null, inv: any) => {
-              if (!inv.invited_at) return latest;
-              if (!latest) return inv.invited_at;
-              return inv.invited_at > latest ? inv.invited_at : latest;
-            }, null)
-          : null;
+      // Fetch invite counts separately
+      const { data: invitesData, error: invitesError } = await supabase
+        .from('event_invitees')
+        .select('contact_id, invited_at');
+
+      if (invitesError) {
+        console.error('Error fetching invites:', invitesError.message);
+        // Continue without invite counts
+      }
+
+      // Build a map of contact_id -> { count, lastInvitedAt }
+      const inviteMap = new Map<string, { count: number; lastInvitedAt: string | null }>();
+      (invitesData || []).forEach((inv: any) => {
+        const existing = inviteMap.get(inv.contact_id);
+        if (existing) {
+          existing.count++;
+          if (inv.invited_at && (!existing.lastInvitedAt || inv.invited_at > existing.lastInvitedAt)) {
+            existing.lastInvitedAt = inv.invited_at;
+          }
+        } else {
+          inviteMap.set(inv.contact_id, { count: 1, lastInvitedAt: inv.invited_at });
+        }
+      });
+
+      const mapped = (contactsData || []).map((c: any) => {
+        const inviteInfo = inviteMap.get(c.id) || { count: 0, lastInvitedAt: null };
         
         return {
           id: c.id,
@@ -172,8 +181,8 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
           name: c.name || c.email || 'Unknown',
           phone: c.phone || undefined,
           addedAt: c.created_at,
-          lastInvitedAt: lastInvitedAt || c.updated_at || c.created_at,
-          eventCount,
+          lastInvitedAt: inviteInfo.lastInvitedAt || c.updated_at || c.created_at,
+          eventCount: inviteInfo.count,
           createdAt: c.created_at,
           updatedAt: c.updated_at,
         };

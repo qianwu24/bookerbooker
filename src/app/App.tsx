@@ -5,8 +5,9 @@ import { HomePage } from './components/home-page';
 import { BetaGate, useBetaAccess } from './components/beta-gate';
 import { supabase } from './utils/supabase-client';
 
-// Set to true to enable beta password protection
-const BETA_MODE_ENABLED = import.meta.env.VITE_BETA_MODE === 'true';
+// Beta password protection - hardcoded for reliability
+// Set to false when ready for public launch
+const BETA_MODE_ENABLED = true;
 
 export default function App() {
   const { hasAccess, grantAccess, revokeAccess } = useBetaAccess();
