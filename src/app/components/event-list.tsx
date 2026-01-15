@@ -21,20 +21,20 @@ const calculateEventStatuses = (event: Event): { confirmationStatus: Confirmatio
   const hasPassed = eventDateTime < now;
   const hasAccepted = event.invitees.some(inv => inv.status === 'accepted');
   const hasInvited = event.invitees.some(inv => inv.status === 'invited');
+  const hasPending = event.invitees.some(inv => inv.status === 'pending');
   
-  // Confirmation status: scheduled (accepted) > invited > no-show
+  // Confirmation status: scheduled (accepted) > invited > no-show (only for past events)
   let confirmationStatus: ConfirmationStatus;
   if (hasAccepted) {
     confirmationStatus = 'scheduled';
-  } else if (hasInvited || event.invitees.some(inv => inv.status === 'pending')) {
+  } else if (hasPassed) {
+    // Past event with no accepted invitees = no-show
+    confirmationStatus = 'no-show';
+  } else if (hasInvited || hasPending) {
     confirmationStatus = 'invited';
   } else {
-    confirmationStatus = 'no-show';
-  }
-  
-  // For past events with no acceptance, mark as no-show
-  if (hasPassed && !hasAccepted) {
-    confirmationStatus = 'no-show';
+    // Future event with no invitees yet - treat as invited (pending setup)
+    confirmationStatus = 'invited';
   }
   
   // Time status
