@@ -1,4 +1,4 @@
-import { Calendar, Clock, MapPin, User, ChevronDown, ChevronUp, Users, Zap, Timer, Trash2, CheckCircle, XCircle, AlertCircle, CalendarDays, Mail } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, ChevronDown, ChevronUp, Users, Zap, Timer, Trash2, CheckCircle, XCircle, AlertCircle, CalendarDays, Mail, Phone } from 'lucide-react';
 import { useState } from 'react';
 import type { Event, InviteeStatus, ConfirmationStatus, TimeStatus } from '../types';
 
@@ -317,8 +317,21 @@ export function EventCard({
                       </div>
                     )}
                     <div className="flex-1">
-                      <p className="text-sm">{invitee.name}</p>
-                      <p className="text-xs text-gray-500">{invitee.email || invitee.phone}</p>
+                      <p className="text-sm font-medium">{invitee.name}</p>
+                      <div className="flex flex-col gap-0.5">
+                        {invitee.email && (
+                          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                            <Mail className="w-3 h-3" />
+                            <span>{invitee.email}</span>
+                          </div>
+                        )}
+                        {invitee.phone && (
+                          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                            <Phone className="w-3 h-3" />
+                            <span>{invitee.phone}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <span
                       className={`px-2 py-1 rounded text-xs ${getStatusColor(
