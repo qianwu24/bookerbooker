@@ -106,23 +106,30 @@ export function CreateEvent({
     return emailRegex.test(email);
   };
 
-  // Phone validation helper (E.164 format: +1XXXXXXXXXX)
-  const isValidPhone = (phone: string): boolean => {
-    // E.164 format: + followed by 1-15 digits
-    const phoneRegex = /^\+[1-9]\d{1,14}$/;
-    return phoneRegex.test(phone.replace(/\s/g, ''));
-  };
-
-  // Format phone number hint
-  const formatPhoneHint = (phone: string): string => {
+  // Normalize phone number to E.164 format (auto-add +1 for US/Canada)
+  const normalizePhone = (phone: string): string => {
     const cleaned = phone.replace(/\D/g, '');
+    // 10 digits: assume US/Canada, add +1
     if (cleaned.length === 10) {
       return `+1${cleaned}`;
     }
+    // 11 digits starting with 1: add +
     if (cleaned.length === 11 && cleaned.startsWith('1')) {
       return `+${cleaned}`;
     }
+    // Already has + prefix, return as-is
+    if (phone.startsWith('+')) {
+      return phone.replace(/\s/g, '');
+    }
     return phone;
+  };
+
+  // Phone validation helper (E.164 format: +1XXXXXXXXXX)
+  const isValidPhone = (phone: string): boolean => {
+    const normalized = normalizePhone(phone);
+    // E.164 format: + followed by 1-15 digits
+    const phoneRegex = /^\+[1-9]\d{1,14}$/;
+    return phoneRegex.test(normalized);
   };
 
   // Date/time validation helper
@@ -212,11 +219,10 @@ export function CreateEvent({
       return;
     }
     
-    // Validate phone format if provided (E.164: +1XXXXXXXXXX)
+    // Normalize and validate phone format if provided
+    const normalizedPhone = hasPhone ? normalizePhone(newInviteePhone.trim()) : undefined;
     if (hasPhone && !isValidPhone(newInviteePhone.trim())) {
-      const hint = formatPhoneHint(newInviteePhone.trim());
-      const suggestion = hint !== newInviteePhone.trim() ? ` Try: ${hint}` : '';
-      setErrors({ ...newErrors, inviteePhone: `Phone must be in E.164 format (e.g., +12025551234).${suggestion}` });
+      setErrors({ ...newErrors, inviteePhone: 'Invalid phone number. Enter 10 digits (e.g., 6478850820) or full E.164 format (+16478850820)' });
       return;
     }
     
@@ -226,13 +232,12 @@ export function CreateEvent({
       return;
     }
     
-    // Check for duplicate (by email or phone)
+    // Check for duplicate (by email or normalized phone)
     const emailToCheck = hasEmail ? newInviteeEmail.trim().toLowerCase() : null;
-    const phoneToCheck = hasPhone ? newInviteePhone.trim() : null;
     
     const isDuplicate = invitees.some(inv => {
       if (emailToCheck && inv.email?.toLowerCase() === emailToCheck) return true;
-      if (phoneToCheck && inv.phone === phoneToCheck) return true;
+      if (normalizedPhone && inv.phone === normalizedPhone) return true;
       return false;
     });
     
@@ -244,7 +249,7 @@ export function CreateEvent({
     const newInvitee: Invitee = {
       email: hasEmail ? newInviteeEmail.trim() : undefined,
       name: newInviteeName.trim(),
-      phone: hasPhone ? newInviteePhone.trim() : undefined,
+      phone: normalizedPhone,
       priority: invitees.length,
       // In first-come-first-serve mode, everyone is invited immediately
       status: inviteMode === 'first-come-first-serve' ? 'invited' : (invitees.length === 0 ? 'invited' : 'pending'),
@@ -757,7 +762,7 @@ export function CreateEvent({
                     type="tel"
                     value={newInviteePhone}
                     onChange={(e) => setNewInviteePhone(e.target.value)}
-                    placeholder="+1234567890"
+                    placeholder="6478850820"
                     className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none ${errors.inviteePhone ? 'border-red-500' : 'border-gray-300'}`}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
