@@ -348,17 +348,7 @@ const sendInviteEmail = async (
 
     const templateId = variant === 'invite' ? RESEND_TEMPLATE_ID : RESEND_CONFIRM_TEMPLATE_ID;
 
-    const payload: Record<string, unknown> = templateId ? {
-      from: RESEND_FROM_EMAIL,
-      to: [invitee.email],
-      subject,
-      template_id: templateId,
-      variables: {
-        ...templateVariables,
-        variant,
-      },
-      attachments: attachments.length ? attachments : undefined,
-    } : {
+    const payload: Record<string, unknown> = {
       from: RESEND_FROM_EMAIL,
       to: [invitee.email],
       subject,
@@ -367,11 +357,10 @@ const sendInviteEmail = async (
       attachments: attachments.length ? attachments : undefined,
     };
 
-    console.log(templateId ? 'Sending via Resend template' : 'Sending via Resend inline', {
+    console.log('Sending via Resend', {
       to: invitee.email,
       subject,
-      templateId,
-      data: templateVariables,
+      variant,
       hasIcs: attachments.length > 0,
     });
 
