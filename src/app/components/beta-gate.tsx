@@ -3,7 +3,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
-const BETA_PASSWORD = import.meta.env.VITE_BETA_PASSWORD || 'beta2026';
+// Hardcoded beta password - change this when needed
+const BETA_PASSWORD = 'tennisprince';
 const STORAGE_KEY = 'scheduler_beta_access';
 
 export function useBetaAccess() {
