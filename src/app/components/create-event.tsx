@@ -37,6 +37,45 @@ export function CreateEvent({
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [duplicateAlert, setDuplicateAlert] = useState<string | null>(null);
 
+  // Generate date options (next 90 days)
+  const generateDateOptions = () => {
+    const options = [];
+    const today = new Date();
+    for (let i = 0; i < 90; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const value = d.toISOString().split('T')[0]; // YYYY-MM-DD
+      const label = d.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric',
+        year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+      });
+      options.push({ value, label });
+    }
+    return options;
+  };
+
+  // Generate time options (every 15 minutes)
+  const generateTimeOptions = () => {
+    const options = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        const hour24 = h.toString().padStart(2, '0');
+        const min = m.toString().padStart(2, '0');
+        const value = `${hour24}:${min}`;
+        const hour12 = h % 12 || 12;
+        const period = h >= 12 ? 'PM' : 'AM';
+        const label = `${hour12}:${min} ${period}`;
+        options.push({ value, label });
+      }
+    }
+    return options;
+  };
+
+  const dateOptions = generateDateOptions();
+  const timeOptions = generateTimeOptions();
+
   // Load cached locations on mount
   useEffect(() => {
     const readKey = (key: string) => {
@@ -86,9 +125,16 @@ export function CreateEvent({
 
   // Add invitee from contact
   const handleAddFromContact = (contact: Contact) => {
+    // Prevent adding yourself as an invitee
+    if (contact.email?.toLowerCase() === currentUser.email.toLowerCase()) {
+      setDuplicateAlert("You can't invite yourself");
+      setTimeout(() => setDuplicateAlert(null), 3000);
+      return;
+    }
+    
     // Check for duplicate email
-    if (invitees.some(inv => inv.email?.toLowerCase() === contact.email.toLowerCase())) {
-      setDuplicateAlert(contact.email);
+    if (invitees.some(inv => inv.email?.toLowerCase() === contact.email?.toLowerCase())) {
+      setDuplicateAlert(contact.email || 'This contact');
       // Auto-dismiss after 3 seconds
       setTimeout(() => setDuplicateAlert(null), 3000);
       return;
@@ -104,9 +150,11 @@ export function CreateEvent({
     setInvitees([...invitees, newInvitee]);
   };
 
-  // Get available contacts (not already added as invitees)
+  // Get available contacts (not already added as invitees and not the current user)
   const availableContacts = contacts.filter(
-    contact => !invitees.some(inv => inv.email?.toLowerCase() === contact.email.toLowerCase())
+    contact => 
+      contact.email?.toLowerCase() !== currentUser.email.toLowerCase() &&
+      !invitees.some(inv => inv.email?.toLowerCase() === contact.email?.toLowerCase())
   );
 
   const handleAddInvitee = () => {
@@ -134,6 +182,12 @@ export function CreateEvent({
     // Validate email format if provided
     if (hasEmail && !isValidEmail(newInviteeEmail.trim())) {
       setErrors({ ...newErrors, inviteeEmail: 'Please enter a valid email address' });
+      return;
+    }
+    
+    // Prevent adding yourself as an invitee
+    if (hasEmail && newInviteeEmail.trim().toLowerCase() === currentUser.email.toLowerCase()) {
+      setErrors({ ...newErrors, inviteeEmail: "You can't invite yourself" });
       return;
     }
     
@@ -332,15 +386,22 @@ export function CreateEvent({
                 Date *
               </label>
               <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                <select
                   id="date"
-                  type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none appearance-none bg-white"
                   required
-                />
+                >
+                  <option value="">Select date...</option>
+                  {dateOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 {errors.date && <p className="text-red-500 text-sm mt-1">{errors.date}</p>}
               </div>
             </div>
@@ -350,15 +411,22 @@ export function CreateEvent({
                 Time *
               </label>
               <div className="relative">
-                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
+                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                <select
                   id="time"
-                  type="time"
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none appearance-none bg-white"
                   required
-                />
+                >
+                  <option value="">Select time...</option>
+                  {timeOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 {errors.time && <p className="text-red-500 text-sm mt-1">{errors.time}</p>}
               </div>
             </div>

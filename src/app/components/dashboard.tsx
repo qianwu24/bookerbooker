@@ -136,28 +136,56 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
   const fetchContacts = async () => {
     try {
       console.log('📒 Fetching contacts...');
+      
+      // Fetch contacts with their invite counts
       const { data, error } = await supabase
         .from('contacts')
-        .select('*')
-        .eq('owner_id', user.id)
-        .order('name', { ascending: true });
+        .select(`
+          *,
+          event_invitees (
+            id,
+            invited_at
+          )
+        `)
+        .eq('owner_id', user.id);
 
       if (error) {
         console.error('Error fetching contacts:', error.message);
         return;
       }
 
-      const mapped = (data || []).map((c) => ({
-        id: c.id,
-        email: c.email || undefined,
-        name: c.name || c.email || 'Unknown',
-        phone: c.phone || undefined,
-        addedAt: c.created_at,
-        lastInvitedAt: c.updated_at || c.created_at,
-        eventCount: 0,
-        createdAt: c.created_at,
-        updatedAt: c.updated_at,
-      }));
+      const mapped = (data || []).map((c: any) => {
+        const invites = c.event_invitees || [];
+        const eventCount = invites.length;
+        // Find the most recent invite
+        const lastInvitedAt = invites.length > 0
+          ? invites.reduce((latest: string | null, inv: any) => {
+              if (!inv.invited_at) return latest;
+              if (!latest) return inv.invited_at;
+              return inv.invited_at > latest ? inv.invited_at : latest;
+            }, null)
+          : null;
+        
+        return {
+          id: c.id,
+          email: c.email || undefined,
+          name: c.name || c.email || 'Unknown',
+          phone: c.phone || undefined,
+          addedAt: c.created_at,
+          lastInvitedAt: lastInvitedAt || c.updated_at || c.created_at,
+          eventCount,
+          createdAt: c.created_at,
+          updatedAt: c.updated_at,
+        };
+      });
+
+      // Sort by eventCount (descending), then by name
+      mapped.sort((a, b) => {
+        if (b.eventCount !== a.eventCount) {
+          return b.eventCount - a.eventCount;
+        }
+        return a.name.localeCompare(b.name);
+      });
 
       setContacts(mapped);
     } catch (error) {
@@ -568,10 +596,13 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setView('list')}
+              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+            >
               <BookerLogo className="w-8 h-8 text-indigo-600" />
               <h1 className="text-indigo-600">Booker</h1>
-            </div>
+            </button>
 
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
