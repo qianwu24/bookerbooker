@@ -570,7 +570,10 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
     badge: isAccepted ? 'OK' : 'X',
   });
 
-  return c.html(html);
+  return new Response(html, {
+    status: 200,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  });
 });
 
 // Scheduled endpoint to auto-promote when invited users don't respond in time
