@@ -2,9 +2,14 @@ import { useState, useEffect } from 'react';
 import { LoginScreen } from './components/login-screen';
 import { Dashboard } from './components/dashboard';
 import { HomePage } from './components/home-page';
+import { BetaGate, useBetaAccess } from './components/beta-gate';
 import { supabase } from './utils/supabase-client';
 
+// Set to true to enable beta password protection
+const BETA_MODE_ENABLED = import.meta.env.VITE_BETA_MODE === 'true';
+
 export default function App() {
+  const { hasAccess, grantAccess } = useBetaAccess();
   const [user, setUser] = useState<{
     id: string;
     email: string;
@@ -96,6 +101,11 @@ export default function App() {
         </div>
       </div>
     );
+  }
+
+  // Show beta gate if beta mode is enabled and user doesn't have access
+  if (BETA_MODE_ENABLED && !hasAccess) {
+    return <BetaGate onAccessGranted={grantAccess} />;
   }
 
   return (
