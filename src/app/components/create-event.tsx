@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Clock, MapPin, Plus, X, ArrowUp, ArrowDown, Users, Zap, UserPlus, AlertCircle, ChevronDown, Phone } from 'lucide-react';
+import { Calendar, Clock, MapPin, Plus, X, ArrowUp, ArrowDown, Users, Zap, UserPlus, AlertCircle, ChevronDown, Phone, Loader2 } from 'lucide-react';
 import type { Event, Invitee, InviteMode, Contact } from '../types';
 
 interface CreateEventProps {
   currentUser: { email: string; name: string };
   contacts: Contact[];
   timeZone?: string;
-  onCreateEvent: (event: Omit<Event, 'id' | 'organizer' | 'createdAt'>) => void;
+  onCreateEvent: (event: Omit<Event, 'id' | 'organizer' | 'createdAt'>) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -36,6 +36,7 @@ export function CreateEvent({
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [duplicateAlert, setDuplicateAlert] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   // Generate date options (next 90 days)
   const generateDateOptions = () => {
@@ -257,7 +258,7 @@ export function CreateEvent({
     setInvitees(recalculated);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate inputs
@@ -323,7 +324,12 @@ export function CreateEvent({
 
     rememberLocation(trimmedLocation);
 
-    onCreateEvent(event);
+    setIsCreating(true);
+    try {
+      await onCreateEvent(event);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
@@ -880,15 +886,24 @@ export function CreateEvent({
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              disabled={isCreating}
+              className="flex-1 px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              disabled={isCreating}
+              className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Create Event
+              {isCreating ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Event'
+              )}
             </button>
           </div>
         </form>
