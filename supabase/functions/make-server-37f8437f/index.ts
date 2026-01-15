@@ -433,8 +433,23 @@ interface SmsPayload {
  * Send SMS via Twilio using API Key authentication
  */
 const sendSms = async (payload: SmsPayload): Promise<boolean> => {
+  console.log('📱 [SMS] Attempting to send SMS...', {
+    to: payload.to,
+    messageLength: payload.message.length,
+    messagePreview: payload.message.substring(0, 50) + '...',
+  });
+
+  // Log credential status (not the actual values for security)
+  console.log('📱 [SMS] Credential check:', {
+    hasAccountSid: !!TWILIO_ACCOUNT_SID,
+    hasApiKey: !!TWILIO_API_KEY,
+    hasApiSecret: !!TWILIO_API_SECRET,
+    hasPhoneNumber: !!TWILIO_PHONE_NUMBER,
+    fromNumber: TWILIO_PHONE_NUMBER ? TWILIO_PHONE_NUMBER.substring(0, 5) + '***' : 'NOT SET',
+  });
+
   if (!TWILIO_ACCOUNT_SID || !TWILIO_API_KEY || !TWILIO_API_SECRET || !TWILIO_PHONE_NUMBER) {
-    console.log('SMS not sent: Twilio credentials not configured');
+    console.log('❌ [SMS] SMS not sent: Twilio credentials not configured');
     return false;
   }
 
@@ -448,6 +463,12 @@ const sendSms = async (payload: SmsPayload): Promise<boolean> => {
     formData.append('From', TWILIO_PHONE_NUMBER);
     formData.append('Body', payload.message);
 
+    console.log('📱 [SMS] Sending request to Twilio...', {
+      url,
+      to: payload.to,
+      from: TWILIO_PHONE_NUMBER,
+    });
+
     const res = await fetch(url, {
       method: 'POST',
       headers: {
@@ -457,17 +478,23 @@ const sendSms = async (payload: SmsPayload): Promise<boolean> => {
       body: formData.toString(),
     });
 
+    const responseText = await res.text();
+    console.log('📱 [SMS] Twilio response:', {
+      status: res.status,
+      statusText: res.statusText,
+      body: responseText,
+    });
+
     if (!res.ok) {
-      const errText = await res.text();
-      console.log('Twilio SMS failed:', res.status, res.statusText, errText);
+      console.log('❌ [SMS] Twilio SMS failed:', res.status, res.statusText, responseText);
       return false;
     }
 
-    const data = await res.json();
-    console.log('SMS sent successfully:', { sid: data.sid, to: payload.to });
+    const data = JSON.parse(responseText);
+    console.log('✅ [SMS] SMS sent successfully:', { sid: data.sid, to: payload.to, status: data.status });
     return true;
   } catch (error) {
-    console.log('Error sending SMS:', error);
+    console.log('❌ [SMS] Error sending SMS:', error);
     return false;
   }
 };
@@ -1249,15 +1276,28 @@ app.post("/make-server-37f8437f/events", async (c) => {
 
     // Send invitee invites only (no email to organizer on event creation)
     // Invitees - send sequentially to respect Resend rate limit (1 email/sec)
+    console.log('📤 [EVENT CREATE] Sending invitations to', invitedNow.length, 'invitees');
     if (invitedNow.length > 0) {
       for (const inv of invitedNow) {
         const email = inv.contact?.email || inv.email;
         const name = inv.contact?.name || inv.name;
         const phone = inv.contact?.phone;
-        if (!email) continue;
+        
+        console.log('📤 [EVENT CREATE] Processing invitee:', {
+          email,
+          name,
+          phone: phone || 'NO PHONE',
+          hasPhone: !!phone,
+        });
+        
+        if (!email) {
+          console.log('⚠️ [EVENT CREATE] Skipping invitee - no email');
+          continue;
+        }
         const urls = await buildRsvpUrls(responseEvent.id, email);
         
         // Send email invitation
+        console.log('📧 [EVENT CREATE] Sending email to:', email);
         await sendInviteEmail(
           { email, name },
           {
@@ -1277,6 +1317,7 @@ app.post("/make-server-37f8437f/events", async (c) => {
         
         // Send SMS invitation if phone number is available
         if (phone) {
+          console.log('📱 [EVENT CREATE] Sending SMS to:', phone);
           await sendInvitationSms(phone, {
             eventId: responseEvent.id,
             eventTitle: responseEvent.title,
@@ -1286,6 +1327,8 @@ app.post("/make-server-37f8437f/events", async (c) => {
             organizerName: responseEvent.organizer.name || 'Organizer',
             inviteeName: name,
           });
+        } else {
+          console.log('📱 [EVENT CREATE] No phone number for invitee, skipping SMS');
         }
       };
     }
