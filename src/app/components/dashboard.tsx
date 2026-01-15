@@ -174,7 +174,10 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
         phone: invitee.phone,
       }));
 
-      const { error } = await supabase.from('contacts').upsert(records, { onConflict: 'email' });
+      // Upsert per owner+email to avoid clobbering other users' contacts
+      const { error } = await supabase
+        .from('contacts')
+        .upsert(records, { onConflict: 'owner_id,email' });
       if (error) {
         console.error('Error upserting contacts:', error.message);
       }
