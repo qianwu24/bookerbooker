@@ -441,16 +441,73 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
   const { eventId, inviteeEmail, action } = payload;
   const supabase = getServiceClient();
 
-  // Update invitee status
-  const { data: invitee, error: inviteeError } = await supabase
+  // Fetch all invitees for this event to check business rules
+  const { data: allInvitees, error: inviteesError } = await supabase
     .from('event_invitees')
     .select('*, contact:contacts!inner(email, name, owner_id)')
-    .eq('event_id', eventId)
-    .eq('contact.email', inviteeEmail)
-    .single();
+    .eq('event_id', eventId);
 
-  if (inviteeError || !invitee) {
+  if (inviteesError || !allInvitees) {
+    return c.json({ error: 'Failed to fetch invitees' }, 500);
+  }
+
+  const invitee = allInvitees.find(
+    (inv) => inv.contact.email.toLowerCase() === inviteeEmail.toLowerCase()
+  );
+
+  if (!invitee) {
     return c.json({ error: 'Invitee not found' }, 404);
+  }
+
+  // Business rule: Check if someone else already accepted (only one person can accept)
+  const alreadyAccepted = allInvitees.find(
+    (inv) => inv.status === 'accepted' && inv.contact.email.toLowerCase() !== inviteeEmail.toLowerCase()
+  );
+
+  if (action === 'confirm' && alreadyAccepted) {
+    const html = buildResultPage({
+      title: 'Already Confirmed',
+      detail: 'Sorry, this event has already been confirmed by another invitee.',
+      eventTitle: '',
+      eventWhen: '',
+      accentColor: '#f59e0b',
+      badge: '!',
+    });
+    return new Response(html, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
+  }
+
+  // Check if invitee already responded
+  if (invitee.status === 'accepted') {
+    const html = buildResultPage({
+      title: 'Already Accepted',
+      detail: 'You have already accepted this invitation.',
+      eventTitle: '',
+      eventWhen: '',
+      accentColor: '#16a34a',
+      badge: '✓',
+    });
+    return new Response(html, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
+  }
+
+  if (invitee.status === 'declined') {
+    const html = buildResultPage({
+      title: 'Already Declined',
+      detail: 'You have already declined this invitation.',
+      eventTitle: '',
+      eventWhen: '',
+      accentColor: '#6b7280',
+      badge: 'X',
+    });
+    return new Response(html, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
   }
 
   // Database constraint allows: pending, invited, accepted, declined
