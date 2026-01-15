@@ -29,6 +29,7 @@ const getServiceClient = () => createClient(
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const RESEND_FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL');
 const RESEND_TEMPLATE_ID = Deno.env.get('RESEND_TEMPLATE_ID');
+const RESEND_CONFIRM_TEMPLATE_ID = Deno.env.get('RESEND_CONFIRM_TEMPLATE_ID');
 const APP_BASE_URL = Deno.env.get('APP_BASE_URL') || 'https://bookerbooker.com';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 // Functions base used for RSVP links so they hit the Edge Function directly (avoids SPA 404)
@@ -226,14 +227,18 @@ const buildResultPage = (options: {
 const sendInviteEmail = async (
   invitee: InviteePayload,
   event: EventEmailPayload,
+  options?: { variant?: 'invite' | 'confirm' }
 ): Promise<boolean> => {
+  const variant = options?.variant ?? 'invite';
   if (!RESEND_API_KEY || !RESEND_FROM_EMAIL) {
     console.log('Email not sent: RESEND_API_KEY or RESEND_FROM_EMAIL not configured');
     return false;
   }
 
   try {
-    const subject = `You're invited: ${event.title}`;
+    const subject = variant === 'invite'
+      ? `You're invited: ${event.title}`
+      : `You're confirmed: ${event.title}`;
 
     const durationText = event.durationMinutes
       ? `${event.durationMinutes} minute${event.durationMinutes === 1 ? '' : 's'}`
@@ -256,29 +261,42 @@ const sendInviteEmail = async (
       org_name: event.orgName || 'Booker',
     };
 
-    const bodyText = [
-      `Hi ${templateVariables.invitee_name}`,
-      '',
-      `${templateVariables.host_name} invited you to ${templateVariables.event_title}.`,
-      `Date: ${templateVariables.event_date}`,
-      `Time: ${templateVariables.event_time} (${templateVariables.event_time_zone})`,
-      `Duration: ${templateVariables.event_duration}`,
-      `Location: ${templateVariables.event_location}`,
-      `Organizer: ${templateVariables.host_name}`,
-      `Notes: ${templateVariables.event_notes}`,
-      '',
-      'RSVP:',
-      `Confirm: ${templateVariables.confirm_url}`,
-      `Decline: ${templateVariables.decline_url}`,
-      '',
-      `Sent by ${templateVariables.org_name}`,
-    ].join('\n');
+    const bodyText = variant === 'invite'
+      ? [
+          `Hi ${templateVariables.invitee_name}`,
+          '',
+          `${templateVariables.host_name} invited you to ${templateVariables.event_title}.`,
+          `Date: ${templateVariables.event_date}`,
+          `Time: ${templateVariables.event_time} (${templateVariables.event_time_zone})`,
+          `Duration: ${templateVariables.event_duration}`,
+          `Location: ${templateVariables.event_location}`,
+          `Organizer: ${templateVariables.host_name}`,
+          `Notes: ${templateVariables.event_notes}`,
+          '',
+          'RSVP:',
+          `Confirm: ${templateVariables.confirm_url}`,
+          `Decline: ${templateVariables.decline_url}`,
+          '',
+          `Sent by ${templateVariables.org_name}`,
+        ].join('\n')
+      : [
+          `Hi ${templateVariables.invitee_name}`,
+          '',
+          `You're confirmed for ${templateVariables.event_title}.`,
+          `Date: ${templateVariables.event_date}`,
+          `Time: ${templateVariables.event_time} (${templateVariables.event_time_zone})`,
+          `Duration: ${templateVariables.event_duration}`,
+          `Location: ${templateVariables.event_location}`,
+          `Organizer: ${templateVariables.host_name}`,
+          `Notes: ${templateVariables.event_notes}`,
+          '',
+          `View: ${templateVariables.confirm_url}`,
+          '',
+          `Sent by ${templateVariables.org_name}`,
+        ].join('\n');
 
-    const bodyHtml = `
-      <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px; color:#0f172a;">
-        <h2 style="margin:0 0 12px 0;">You're invited: ${templateVariables.event_title}</h2>
-        <p style="margin:0 0 12px 0;">Hi ${templateVariables.invitee_name},</p>
-        <p style="margin:0 0 14px 0;">${templateVariables.host_name} invited you to <strong>${templateVariables.event_title}</strong>.</p>
+    const buttonsHtml = variant === 'invite'
+      ? `
         <p style="margin:0 0 10px 0; font-weight:600;">Quick RSVP</p>
         <table role="presentation" cellspacing="0" cellpadding="0" style="border-collapse:separate; border-spacing:0 10px; margin:0 0 12px 0;">
           <tr>
@@ -292,6 +310,23 @@ const sendInviteEmail = async (
             </td>
           </tr>
         </table>
+      `
+      : `
+        <div style="margin:0 0 14px 0;">
+          <a href="${templateVariables.confirm_url}" style="display:inline-block; padding:12px 16px; background:#4f46e5; color:#ffffff; text-decoration:none; border-radius:10px; font-weight:700; text-align:center;">View event</a>
+        </div>
+      `;
+
+    const inviteeGreeting = variant === 'invite'
+      ? `${templateVariables.host_name} invited you to <strong>${templateVariables.event_title}</strong>.`
+      : `You are confirmed for <strong>${templateVariables.event_title}</strong>.`;
+
+    const bodyHtml = `
+      <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px; color:#0f172a;">
+        <h2 style="margin:0 0 12px 0;">${variant === 'invite' ? "You're invited" : "You're confirmed"}: ${templateVariables.event_title}</h2>
+        <p style="margin:0 0 12px 0;">Hi ${templateVariables.invitee_name},</p>
+        <p style="margin:0 0 14px 0;">${inviteeGreeting}</p>
+        ${buttonsHtml}
         <p style="margin:0 0 12px 0;">Event details:</p>
         <ul style="padding-left:18px; margin:0 0 16px 0; line-height:1.4;">
           <li><strong>Date:</strong> ${templateVariables.event_date}</li>
@@ -301,7 +336,9 @@ const sendInviteEmail = async (
           <li><strong>Organizer:</strong> ${templateVariables.host_name}</li>
         </ul>
         <p style="margin:0 0 16px 0;">Notes: ${templateVariables.event_notes}</p>
-        <p style="margin:0; font-size:12px; color:#475569;">If you do not see the buttons, copy these links:<br />Confirm: ${templateVariables.confirm_url}<br />Decline: ${templateVariables.decline_url}</p>
+        <p style="margin:0; font-size:12px; color:#475569;">${variant === 'invite'
+          ? `If you do not see the buttons, copy these links:<br />Confirm: ${templateVariables.confirm_url}<br />Decline: ${templateVariables.decline_url}`
+          : `If the button does not work, open: ${templateVariables.confirm_url}`}</p>
       </div>`;
 
     const attachments: EmailAttachment[] = [];
@@ -309,7 +346,19 @@ const sendInviteEmail = async (
       attachments.push({ filename: 'event.ics', content: event.icsContent });
     }
 
-    const payload: Record<string, unknown> = {
+    const templateId = variant === 'invite' ? RESEND_TEMPLATE_ID : RESEND_CONFIRM_TEMPLATE_ID;
+
+    const payload: Record<string, unknown> = templateId ? {
+      from: RESEND_FROM_EMAIL,
+      to: [invitee.email],
+      subject,
+      template_id: templateId,
+      variables: {
+        ...templateVariables,
+        variant,
+      },
+      attachments: attachments.length ? attachments : undefined,
+    } : {
       from: RESEND_FROM_EMAIL,
       to: [invitee.email],
       subject,
@@ -318,9 +367,10 @@ const sendInviteEmail = async (
       attachments: attachments.length ? attachments : undefined,
     };
 
-    console.log('Sending via Resend inline', {
+    console.log(templateId ? 'Sending via Resend template' : 'Sending via Resend inline', {
       to: invitee.email,
       subject,
+      templateId,
       data: templateVariables,
       hasIcs: attachments.length > 0,
     });
@@ -459,6 +509,7 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
         declineUrl: `${APP_BASE_URL}/events/${eventId}`,
         icsContent: ics.content,
       },
+      { variant: 'confirm' },
     );
   }
 
