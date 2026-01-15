@@ -1,11 +1,21 @@
 import { useState, useEffect } from 'react';
-import { Calendar, LogOut, Plus, User, X, Filter, Users, Settings, CheckCircle } from 'lucide-react';
+import { Calendar, LogOut, Plus, User, X, Filter, Users, Settings, CheckCircle, Trash2 } from 'lucide-react';
 import { CreateEvent } from './create-event';
 import { EventList } from './event-list';
 import { ContactList } from './contact-list';
 import { API_BASE_URL } from '../utils/supabase-client';
 import { supabase } from '../utils/supabase-client';
 import { BookerLogo } from './booker-logo';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 import type { Event, InviteeStatus, Contact } from '../types';
 
 interface DashboardProps {
@@ -28,6 +38,8 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
   const [showInviteeFilter, setShowInviteeFilter] = useState(false);
   const [selectedInvitees, setSelectedInvitees] = useState<string[]>([]);
   const [onlyScheduled, setOnlyScheduled] = useState(false);
+  const [showClearNoShowDialog, setShowClearNoShowDialog] = useState(false);
+  const [clearingNoShows, setClearingNoShows] = useState(false);
 
   // Helper function to get fresh access token
   const getFreshToken = async () => {
@@ -405,6 +417,62 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
     } catch (error) {
       console.error('Error updating invitee status:', error);
       alert('An error occurred while updating the status.');
+    }
+  };
+
+  // Get no-show events (past events with no confirmed attendees)
+  const getNoShowEvents = () => {
+    const now = new Date();
+    return events.filter((event) => {
+      const eventDate = new Date(event.date);
+      // Event is in the past
+      if (eventDate >= now) return false;
+      // No accepted invitees
+      const hasAccepted = event.invitees?.some(
+        (inv) => inv.status === 'accepted'
+      );
+      return !hasAccepted;
+    });
+  };
+
+  // Clear no-show events
+  const handleClearNoShowEvents = async () => {
+    const noShowEvents = getNoShowEvents();
+    if (noShowEvents.length === 0) {
+      alert('No past events without confirmed attendees found.');
+      setShowClearNoShowDialog(false);
+      return;
+    }
+
+    setClearingNoShows(true);
+    try {
+      const freshToken = await getFreshToken();
+      let deletedCount = 0;
+      
+      for (const event of noShowEvents) {
+        const response = await fetch(`${API_BASE_URL}/events/${event.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${freshToken}`,
+          },
+        });
+        
+        if (response.ok) {
+          deletedCount++;
+        } else {
+          console.error(`Failed to delete event ${event.id}`);
+        }
+      }
+
+      // Refresh events list
+      await fetchEvents();
+      alert(`Successfully deleted ${deletedCount} no-show event${deletedCount !== 1 ? 's' : ''}.`);
+    } catch (error) {
+      console.error('Error clearing no-show events:', error);
+      alert('An error occurred while clearing no-show events.');
+    } finally {
+      setClearingNoShows(false);
+      setShowClearNoShowDialog(false);
     }
   };
 
@@ -900,6 +968,21 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                     </div>
                   )}
                 </div>
+
+                {/* Clear No-Show Events Button */}
+                <button
+                  onClick={() => setShowClearNoShowDialog(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-white text-red-600 border border-red-200 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors"
+                  title="Delete past events with no confirmed attendees"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Clear No-Shows
+                  {getNoShowEvents().length > 0 && (
+                    <span className="ml-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
+                      {getNoShowEvents().length}
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
             
@@ -1068,6 +1151,30 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
           </div>
         )}
       </main>
+
+      {/* Clear No-Show Events Confirmation Dialog */}
+      <AlertDialog open={showClearNoShowDialog} onOpenChange={setShowClearNoShowDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear No-Show Events?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{getNoShowEvents().length}</strong> past event{getNoShowEvents().length !== 1 ? 's' : ''} that had no confirmed attendees.
+              <br /><br />
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={clearingNoShows}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleClearNoShowEvents}
+              disabled={clearingNoShows}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {clearingNoShows ? 'Deleting...' : 'Delete Events'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
