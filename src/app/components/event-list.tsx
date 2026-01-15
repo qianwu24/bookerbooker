@@ -1,5 +1,5 @@
 import { EventCard } from './event-card';
-import type { Event, InviteeStatus, EventStatus } from '../types';
+import type { Event, InviteeStatus, ConfirmationStatus, TimeStatus } from '../types';
 
 interface EventListProps {
   events: Event[];
@@ -12,32 +12,42 @@ interface EventListProps {
   onCancelEvent: (eventId: string) => void;
 }
 
-// Helper function to calculate event status
-const calculateEventStatus = (event: Event): EventStatus => {
+// Helper function to calculate event statuses (both confirmation and time)
+const calculateEventStatuses = (event: Event): { confirmationStatus: ConfirmationStatus; timeStatus: TimeStatus } => {
   const eventDateTime = new Date(`${event.date}T${event.time}`);
   const now = new Date();
   const hoursUntilEvent = (eventDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
   
-  // Check if event has passed
   const hasPassed = eventDateTime < now;
-  
-  // Check if anyone accepted (event is scheduled/confirmed)
   const hasAccepted = event.invitees.some(inv => inv.status === 'accepted');
+  const hasInvited = event.invitees.some(inv => inv.status === 'invited');
   
-  if (hasPassed) {
-    return hasAccepted ? 'completed' : 'no-show';
-  }
-  
-  // Future events - check if scheduled (has confirmed attendee)
+  // Confirmation status: scheduled (accepted) > invited > no-show
+  let confirmationStatus: ConfirmationStatus;
   if (hasAccepted) {
-    return 'scheduled';
+    confirmationStatus = 'scheduled';
+  } else if (hasInvited || event.invitees.some(inv => inv.status === 'pending')) {
+    confirmationStatus = 'invited';
+  } else {
+    confirmationStatus = 'no-show';
   }
   
-  if (hoursUntilEvent <= 24) {
-    return 'approaching';
+  // For past events with no acceptance, mark as no-show
+  if (hasPassed && !hasAccepted) {
+    confirmationStatus = 'no-show';
   }
   
-  return 'future';
+  // Time status
+  let timeStatus: TimeStatus;
+  if (hasPassed) {
+    timeStatus = 'completed';
+  } else if (hoursUntilEvent <= 24) {
+    timeStatus = 'approaching';
+  } else {
+    timeStatus = 'upcoming';
+  }
+  
+  return { confirmationStatus, timeStatus };
 };
 
 export function EventList({
@@ -61,7 +71,7 @@ export function EventList({
       ) : (
         <div className="space-y-4">
           {sortedEvents.map((event) => {
-            const eventStatus = calculateEventStatus(event);
+            const { confirmationStatus, timeStatus } = calculateEventStatuses(event);
             return (
               <EventCard
                 key={event.id}
@@ -69,7 +79,8 @@ export function EventList({
                 currentUser={currentUser}
                 onUpdateInviteeStatus={onUpdateInviteeStatus}
                 onCancelEvent={onCancelEvent}
-                eventStatus={eventStatus}
+                confirmationStatus={confirmationStatus}
+                timeStatus={timeStatus}
               />
             );
           })}

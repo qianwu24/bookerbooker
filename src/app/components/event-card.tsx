@@ -1,6 +1,6 @@
-import { Calendar, Clock, MapPin, User, ChevronDown, ChevronUp, Users, Zap, Timer, Trash2, CheckCircle, XCircle, AlertCircle, CalendarDays } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, ChevronDown, ChevronUp, Users, Zap, Timer, Trash2, CheckCircle, XCircle, AlertCircle, CalendarDays, Mail } from 'lucide-react';
 import { useState } from 'react';
-import type { Event, InviteeStatus, EventStatus } from '../types';
+import type { Event, InviteeStatus, ConfirmationStatus, TimeStatus } from '../types';
 
 interface EventCardProps {
   event: Event;
@@ -11,7 +11,8 @@ interface EventCardProps {
     status: InviteeStatus
   ) => void;
   onCancelEvent?: (eventId: string) => void;
-  eventStatus: EventStatus;
+  confirmationStatus: ConfirmationStatus;
+  timeStatus: TimeStatus;
 }
 
 export function EventCard({
@@ -19,7 +20,8 @@ export function EventCard({
   currentUser,
   onUpdateInviteeStatus,
   onCancelEvent,
-  eventStatus,
+  confirmationStatus,
+  timeStatus,
 }: EventCardProps) {
   const [expanded, setExpanded] = useState(false);
   
@@ -77,28 +79,25 @@ export function EventCard({
     }
   };
 
-  // Get card styling based on event status
+  // Get card styling based on confirmation status (border color matches confirmation status)
   const getCardStyle = () => {
     if (isAcceptedByCurrentUser) {
       return 'border-emerald-300 bg-emerald-50/50 ring-1 ring-emerald-200 shadow-sm';
     }
-    switch (eventStatus) {
-      case 'completed':
-        return 'border-green-300 bg-green-50/30';
-      case 'no-show':
-        return 'border-gray-300 bg-gray-50 opacity-75';
-      case 'approaching':
-        return 'border-orange-300 bg-orange-50/30';
+    switch (confirmationStatus) {
       case 'scheduled':
         return 'border-green-300 bg-green-50/30';
-      case 'future':
+      case 'invited':
+        return 'border-purple-300 bg-purple-50/30';
+      case 'no-show':
+        return 'border-gray-300 bg-gray-50 opacity-75';
       default:
         return 'border-gray-200 bg-white';
     }
   };
 
-  // Get status badge
-  const getStatusBadge = () => {
+  // Get confirmation status badge (Scheduled/Invited/No Show)
+  const getConfirmationBadge = () => {
     if (isAcceptedByCurrentUser) {
       return (
         <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-medium shadow-inner">
@@ -107,12 +106,19 @@ export function EventCard({
         </div>
       );
     }
-    switch (eventStatus) {
-      case 'completed':
+    switch (confirmationStatus) {
+      case 'scheduled':
         return (
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium">
             <CheckCircle className="w-4 h-4" />
-            <span>Completed</span>
+            <span>Scheduled</span>
+          </div>
+        );
+      case 'invited':
+        return (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm font-medium">
+            <Mail className="w-4 h-4" />
+            <span>Invited</span>
           </div>
         );
       case 'no-show':
@@ -122,6 +128,12 @@ export function EventCard({
             <span>No Show</span>
           </div>
         );
+    }
+  };
+
+  // Get time status badge (Approaching/Upcoming/Completed)
+  const getTimeBadge = () => {
+    switch (timeStatus) {
       case 'approaching':
         return (
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-sm font-medium">
@@ -129,18 +141,18 @@ export function EventCard({
             <span>Approaching</span>
           </div>
         );
-      case 'scheduled':
-        return (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium">
-            <CheckCircle className="w-4 h-4" />
-            <span>Scheduled</span>
-          </div>
-        );
-      case 'future':
+      case 'upcoming':
         return (
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium">
             <CalendarDays className="w-4 h-4" />
             <span>Upcoming</span>
+          </div>
+        );
+      case 'completed':
+        return (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium">
+            <CheckCircle className="w-4 h-4" />
+            <span>Completed</span>
           </div>
         );
     }
@@ -149,9 +161,10 @@ export function EventCard({
   return (
     <div className={`rounded-xl shadow-sm border overflow-hidden ${getCardStyle()}`}>
       <div className="p-6">
-        {/* Event Status Badge */}
-        <div className="mb-4">
-          {getStatusBadge()}
+        {/* Event Status Badges - Two badge groups */}
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          {getConfirmationBadge()}
+          {getTimeBadge()}
         </div>
 
         <div className="flex items-start justify-between mb-4">
