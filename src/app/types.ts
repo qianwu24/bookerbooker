@@ -9,9 +9,9 @@ export type TimeStatus = 'approaching' | 'upcoming' | 'completed';
 export type EventStatus = 'completed' | 'no-show' | 'approaching' | 'scheduled' | 'future';
 
 export interface Invitee {
-  email: string;
+  email?: string; // Optional - either email or phone required
   name: string;
-  phone?: string; // Optional phone number for SMS notifications
+  phone?: string; // Optional - either email or phone required
   priority: number; // Lower number = higher priority
   status: InviteeStatus;
   invitedAt?: string; // Timestamp when this person was invited
@@ -40,9 +40,10 @@ export interface Event {
 }
 
 export interface Contact {
-  email: string;
+  id: string; // UUID primary key
+  email?: string; // Optional - either email or phone required
   name: string;
-  phone?: string; // Optional phone number
+  phone?: string; // Optional - either email or phone required
   addedAt?: string; // When they were first added to contacts
   eventCount?: number; // Number of events they've been invited to
   lastInvitedAt?: string; // Last time they were invited to an event

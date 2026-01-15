@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Clock, MapPin, Plus, X, ArrowUp, ArrowDown, Users, Zap, UserPlus, AlertCircle, ChevronDown } from 'lucide-react';
+import { Calendar, Clock, MapPin, Plus, X, ArrowUp, ArrowDown, Users, Zap, UserPlus, AlertCircle, ChevronDown, Phone } from 'lucide-react';
 import type { Event, Invitee, InviteMode, Contact } from '../types';
 
 interface CreateEventProps {
@@ -87,7 +87,7 @@ export function CreateEvent({
   // Add invitee from contact
   const handleAddFromContact = (contact: Contact) => {
     // Check for duplicate email
-    if (invitees.some(inv => inv.email.toLowerCase() === contact.email.toLowerCase())) {
+    if (invitees.some(inv => inv.email?.toLowerCase() === contact.email.toLowerCase())) {
       setDuplicateAlert(contact.email);
       // Auto-dismiss after 3 seconds
       setTimeout(() => setDuplicateAlert(null), 3000);
@@ -97,6 +97,7 @@ export function CreateEvent({
     const newInvitee: Invitee = {
       email: contact.email,
       name: contact.name,
+      phone: contact.phone,
       priority: invitees.length,
       status: inviteMode === 'first-come-first-serve' ? 'invited' : (invitees.length === 0 ? 'invited' : 'pending'),
     };
@@ -105,7 +106,7 @@ export function CreateEvent({
 
   // Get available contacts (not already added as invitees)
   const availableContacts = contacts.filter(
-    contact => !invitees.some(inv => inv.email.toLowerCase() === contact.email.toLowerCase())
+    contact => !invitees.some(inv => inv.email?.toLowerCase() === contact.email.toLowerCase())
   );
 
   const handleAddInvitee = () => {
@@ -113,6 +114,7 @@ export function CreateEvent({
     const newErrors = { ...errors };
     delete newErrors.inviteeEmail;
     delete newErrors.inviteeName;
+    delete newErrors.inviteePhone;
     
     // Validate name
     if (!newInviteeName || newInviteeName.trim().length === 0) {
@@ -120,27 +122,40 @@ export function CreateEvent({
       return;
     }
     
-    // Validate email
-    if (!newInviteeEmail || newInviteeEmail.trim().length === 0) {
-      setErrors({ ...newErrors, inviteeEmail: 'Email is required' });
+    // Validate that at least email or phone is provided
+    const hasEmail = newInviteeEmail && newInviteeEmail.trim().length > 0;
+    const hasPhone = newInviteePhone && newInviteePhone.trim().length > 0;
+    
+    if (!hasEmail && !hasPhone) {
+      setErrors({ ...newErrors, inviteeEmail: 'Either email or phone is required' });
       return;
     }
     
-    if (!isValidEmail(newInviteeEmail.trim())) {
+    // Validate email format if provided
+    if (hasEmail && !isValidEmail(newInviteeEmail.trim())) {
       setErrors({ ...newErrors, inviteeEmail: 'Please enter a valid email address' });
       return;
     }
     
-    // Check for duplicate email
-    if (invitees.some(inv => inv.email.toLowerCase() === newInviteeEmail.trim().toLowerCase())) {
-      setErrors({ ...newErrors, inviteeEmail: 'This email has already been added' });
+    // Check for duplicate (by email or phone)
+    const emailToCheck = hasEmail ? newInviteeEmail.trim().toLowerCase() : null;
+    const phoneToCheck = hasPhone ? newInviteePhone.trim() : null;
+    
+    const isDuplicate = invitees.some(inv => {
+      if (emailToCheck && inv.email?.toLowerCase() === emailToCheck) return true;
+      if (phoneToCheck && inv.phone === phoneToCheck) return true;
+      return false;
+    });
+    
+    if (isDuplicate) {
+      setErrors({ ...newErrors, inviteeEmail: 'This contact has already been added' });
       return;
     }
 
     const newInvitee: Invitee = {
-      email: newInviteeEmail.trim(),
+      email: hasEmail ? newInviteeEmail.trim() : undefined,
       name: newInviteeName.trim(),
-      phone: newInviteePhone.trim() || undefined,
+      phone: hasPhone ? newInviteePhone.trim() : undefined,
       priority: invitees.length,
       // In first-come-first-serve mode, everyone is invited immediately
       status: inviteMode === 'first-come-first-serve' ? 'invited' : (invitees.length === 0 ? 'invited' : 'pending'),
@@ -627,6 +642,24 @@ export function CreateEvent({
                 />
                 {errors.inviteeEmail && <p className="text-red-500 text-sm mt-1">{errors.inviteeEmail}</p>}
               </div>
+              <div className="flex-1">
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="tel"
+                    value={newInviteePhone}
+                    onChange={(e) => setNewInviteePhone(e.target.value)}
+                    placeholder="Phone (optional)"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddInvitee();
+                      }
+                    }}
+                  />
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={handleAddInvitee}
@@ -729,7 +762,13 @@ export function CreateEvent({
 
                     <div className="flex-1">
                       <p className="text-sm">{invitee.name}</p>
-                      <p className="text-xs text-gray-500">{invitee.email}</p>
+                      <p className="text-xs text-gray-500">{invitee.email || invitee.phone}</p>
+                      {invitee.email && invitee.phone && (
+                        <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                          <Phone className="w-3 h-3" />
+                          {invitee.phone}
+                        </p>
+                      )}
                     </div>
 
                     {/* Status badge - only show in priority mode for first invitee */}

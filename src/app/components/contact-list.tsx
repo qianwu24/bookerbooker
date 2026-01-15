@@ -4,7 +4,7 @@ import type { Contact } from '../types';
 
 interface ContactListProps {
   contacts: Contact[];
-  onDeleteContact: (email: string) => void;
+  onDeleteContact: (contactId: string) => void;
 }
 
 export function ContactList({ contacts, onDeleteContact }: ContactListProps) {
@@ -13,7 +13,8 @@ export function ContactList({ contacts, onDeleteContact }: ContactListProps) {
   const filteredContacts = contacts.filter(
     (contact) =>
       (contact.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.email.toLowerCase().includes(searchQuery.toLowerCase())
+      (contact.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (contact.phone || '').includes(searchQuery)
   );
 
   const formatDate = (dateStr?: string) => {
@@ -77,7 +78,7 @@ export function ContactList({ contacts, onDeleteContact }: ContactListProps) {
             .sort((a, b) => (b.lastInvitedAt || '').localeCompare(a.lastInvitedAt || ''))
             .map((contact) => (
               <div
-                key={contact.email}
+                key={contact.id}
                 className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5"
               >
                 <div className="flex items-start justify-between">
@@ -94,10 +95,12 @@ export function ContactList({ contacts, onDeleteContact }: ContactListProps) {
                       <h3 className="font-semibold text-gray-900 mb-1">
                         {contact.name}
                       </h3>
-                      <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
-                        <Mail className="w-4 h-4 flex-shrink-0" />
-                        <span className="truncate">{contact.email}</span>
-                      </div>
+                      {contact.email && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
+                          <Mail className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate">{contact.email}</span>
+                        </div>
+                      )}
 
                       {/* Phone Number */}
                       {contact.phone && (
@@ -127,7 +130,7 @@ export function ContactList({ contacts, onDeleteContact }: ContactListProps) {
                   <button
                     onClick={() => {
                       if (confirm(`Remove ${contact.name} from contacts?`)) {
-                        onDeleteContact(contact.email);
+                        onDeleteContact(contact.id);
                       }
                     }}
                     className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"

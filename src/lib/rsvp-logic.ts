@@ -4,6 +4,7 @@
  */
 
 export type InviteeStatus = 'pending' | 'invited' | 'accepted' | 'declined';
+export type InviteMode = 'priority' | 'first-come-first-serve';
 
 export interface Invitee {
   id: string;
@@ -25,15 +26,22 @@ export interface RsvpResult {
  * Determines if an RSVP action (confirm/decline) should be allowed
  * and what the outcome should be.
  * 
- * Business rules:
- * 1. Only one person can accept an event (first-come-first-served for acceptance)
- * 2. If someone already accepted, subsequent accepts are rejected
- * 3. When declining, the next pending invitee should be promoted
+ * Business rules for FIRST-COME-FIRST-SERVE mode:
+ * - All invitees are invited at the same time (all have status 'invited')
+ * - First person to accept wins
+ * - No promotion needed on decline (everyone was already invited)
+ * 
+ * Business rules for PRIORITY mode:
+ * - Invitees are invited one at a time in priority order
+ * - First invitee (priority 0) is invited, rest are pending
+ * - When someone declines, next pending invitee is promoted to invited
+ * - Only one person can accept
  */
 export function processRsvpAction(
   invitees: Invitee[],
   targetInviteeEmail: string,
-  action: 'confirm' | 'decline'
+  action: 'confirm' | 'decline',
+  inviteMode: InviteMode = 'priority'
 ): RsvpResult {
   const targetInvitee = invitees.find(
     (inv) => inv.email.toLowerCase() === targetInviteeEmail.toLowerCase()
@@ -49,7 +57,7 @@ export function processRsvpAction(
   );
 
   if (action === 'confirm') {
-    // Rule: Only one person can accept
+    // Rule: Only one person can accept (applies to both modes)
     if (alreadyAccepted) {
       return {
         success: false,
@@ -82,7 +90,16 @@ export function processRsvpAction(
       return { success: false, error: 'You have already accepted this invitation. Contact the organizer to cancel.' };
     }
 
-    // Find next pending invitee to promote
+    // In first-come-first-serve mode, no promotion needed (everyone was already invited)
+    if (inviteMode === 'first-come-first-serve') {
+      return {
+        success: true,
+        newStatus: 'declined',
+        shouldPromoteNext: false,
+      };
+    }
+
+    // In priority mode, find next pending invitee to promote
     const pendingInvitees = invitees
       .filter((inv) => inv.status === 'pending')
       .sort((a, b) => a.priority - b.priority);

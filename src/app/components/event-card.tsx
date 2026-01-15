@@ -27,7 +27,7 @@ export function EventCard({
   
   const isOrganizer = event.organizer.email === currentUser.email;
   const currentUserInvitee = event.invitees.find(
-    (inv) => inv.email === currentUser.email
+    (inv) => inv.email?.toLowerCase() === currentUser.email.toLowerCase()
   );
   const isAcceptedByCurrentUser = currentUserInvitee?.status === 'accepted';
 
@@ -307,7 +307,7 @@ export function EventCard({
                 .sort((a, b) => a.priority - b.priority)
                 .map((invitee, index) => (
                   <div
-                    key={invitee.email}
+                    key={invitee.email || invitee.phone || index}
                     className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
                   >
                     {/* Only show priority number if in priority mode */}
@@ -318,7 +318,7 @@ export function EventCard({
                     )}
                     <div className="flex-1">
                       <p className="text-sm">{invitee.name}</p>
-                      <p className="text-xs text-gray-500">{invitee.email}</p>
+                      <p className="text-xs text-gray-500">{invitee.email || invitee.phone}</p>
                     </div>
                     <span
                       className={`px-2 py-1 rounded text-xs ${getStatusColor(

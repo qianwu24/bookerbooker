@@ -800,32 +800,96 @@ app.post("/make-server-37f8437f/events", async (c) => {
       const isPriorityMode = eventData.inviteMode === 'priority';
       const invitedAt = new Date().toISOString();
 
-      // Upsert contacts per owner/email
-      const contactPayload = eventData.invitees.map((invitee: any) => ({
-        owner_id: user.id,
-        email: invitee.email,
-        name: invitee.name,
-        phone: invitee.phone ?? null,
-      }));
-
-      const { data: contacts, error: contactError } = await supabase
-        .from('contacts')
-        .upsert(contactPayload, { onConflict: 'owner_id,email' })
-        .select();
-
-      if (contactError) {
-        console.log('Error upserting contacts:', contactError);
-      }
-
+      // Upsert contacts - handle email-based and phone-based separately
       const contactMap = new Map<string, any>();
-      (contacts || []).forEach((c: any) => contactMap.set(c.email, c));
+      
+      for (const invitee of eventData.invitees) {
+        const hasEmail = invitee.email && invitee.email.trim().length > 0;
+        const hasPhone = invitee.phone && invitee.phone.trim().length > 0;
+        
+        if (!hasEmail && !hasPhone) {
+          console.log('Skipping invitee without email or phone:', invitee.name);
+          continue;
+        }
+
+        const contactPayload = {
+          owner_id: user.id,
+          email: hasEmail ? invitee.email.trim() : null,
+          name: invitee.name,
+          phone: hasPhone ? invitee.phone.trim() : null,
+        };
+
+        let contact = null;
+        
+        // Try to find existing contact by email or phone
+        if (hasEmail) {
+          const { data: existing } = await supabase
+            .from('contacts')
+            .select()
+            .eq('owner_id', user.id)
+            .eq('email', invitee.email.trim())
+            .single();
+          
+          if (existing) {
+            // Update existing contact
+            const { data: updated } = await supabase
+              .from('contacts')
+              .update({ name: invitee.name, phone: contactPayload.phone })
+              .eq('id', existing.id)
+              .select()
+              .single();
+            contact = updated || existing;
+          }
+        }
+        
+        if (!contact && hasPhone) {
+          const { data: existing } = await supabase
+            .from('contacts')
+            .select()
+            .eq('owner_id', user.id)
+            .eq('phone', invitee.phone.trim())
+            .single();
+          
+          if (existing) {
+            // Update existing contact
+            const { data: updated } = await supabase
+              .from('contacts')
+              .update({ name: invitee.name, email: contactPayload.email })
+              .eq('id', existing.id)
+              .select()
+              .single();
+            contact = updated || existing;
+          }
+        }
+        
+        if (!contact) {
+          // Insert new contact
+          const { data: inserted, error: insertError } = await supabase
+            .from('contacts')
+            .insert(contactPayload)
+            .select()
+            .single();
+          
+          if (insertError) {
+            console.log('Error inserting contact:', insertError);
+          }
+          contact = inserted;
+        }
+        
+        if (contact) {
+          // Use email or phone as key for the map
+          const key = invitee.email || invitee.phone;
+          contactMap.set(key, contact);
+        }
+      }
 
       const inviteesData = eventData.invitees.map((invitee: any, index: number) => {
         const status = isPriorityMode
           ? (index === 0 ? 'invited' : 'pending')
           : 'invited';
 
-        const contact = contactMap.get(invitee.email);
+        const key = invitee.email || invitee.phone;
+        const contact = contactMap.get(key);
 
         return {
           event_id: event.id,

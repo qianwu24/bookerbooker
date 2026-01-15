@@ -166,6 +166,90 @@ describe('processRsvpAction', () => {
       expect(result.promotedInvitee?.email).toBe('bob@example.com'); // Bob has priority 2, should be promoted first
     });
   });
+
+  describe('first-come-first-serve mode', () => {
+    it('should allow any invited person to accept first', () => {
+      // In FCFS mode, all invitees start as "invited"
+      const invitees = [
+        createInvitee('alice@example.com', 'invited', 0),
+        createInvitee('bob@example.com', 'invited', 1),
+        createInvitee('charlie@example.com', 'invited', 2),
+      ];
+
+      const result = processRsvpAction(invitees, 'bob@example.com', 'confirm', 'first-come-first-serve');
+
+      expect(result.success).toBe(true);
+      expect(result.newStatus).toBe('accepted');
+    });
+
+    it('should reject second acceptance after first person accepted', () => {
+      const invitees = [
+        createInvitee('alice@example.com', 'accepted', 0), // First person accepted
+        createInvitee('bob@example.com', 'invited', 1),
+        createInvitee('charlie@example.com', 'invited', 2),
+      ];
+
+      const result = processRsvpAction(invitees, 'bob@example.com', 'confirm', 'first-come-first-serve');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('This event has already been confirmed by another invitee');
+    });
+
+    it('should allow third person to accept if they are fastest', () => {
+      const invitees = [
+        createInvitee('alice@example.com', 'invited', 0),
+        createInvitee('bob@example.com', 'invited', 1),
+        createInvitee('charlie@example.com', 'invited', 2),
+      ];
+
+      // Charlie (priority 2) can accept before Alice (priority 0)
+      const result = processRsvpAction(invitees, 'charlie@example.com', 'confirm', 'first-come-first-serve');
+
+      expect(result.success).toBe(true);
+      expect(result.newStatus).toBe('accepted');
+    });
+
+    it('should NOT promote next invitee on decline (everyone already invited)', () => {
+      const invitees = [
+        createInvitee('alice@example.com', 'invited', 0),
+        createInvitee('bob@example.com', 'invited', 1),
+        createInvitee('charlie@example.com', 'invited', 2),
+      ];
+
+      const result = processRsvpAction(invitees, 'alice@example.com', 'decline', 'first-come-first-serve');
+
+      expect(result.success).toBe(true);
+      expect(result.newStatus).toBe('declined');
+      expect(result.shouldPromoteNext).toBe(false);
+      expect(result.promotedInvitee).toBeUndefined();
+    });
+
+    it('should still allow acceptance after others decline', () => {
+      const invitees = [
+        createInvitee('alice@example.com', 'declined', 0),
+        createInvitee('bob@example.com', 'declined', 1),
+        createInvitee('charlie@example.com', 'invited', 2),
+      ];
+
+      const result = processRsvpAction(invitees, 'charlie@example.com', 'confirm', 'first-come-first-serve');
+
+      expect(result.success).toBe(true);
+      expect(result.newStatus).toBe('accepted');
+    });
+
+    it('should handle race condition: last person can still accept if no one else did', () => {
+      const invitees = [
+        createInvitee('alice@example.com', 'declined', 0),
+        createInvitee('bob@example.com', 'declined', 1),
+        createInvitee('charlie@example.com', 'declined', 2),
+        createInvitee('dave@example.com', 'invited', 3),
+      ];
+
+      const result = processRsvpAction(invitees, 'dave@example.com', 'confirm', 'first-come-first-serve');
+
+      expect(result.success).toBe(true);
+    });
+  });
 });
 
 describe('calculateEventStatuses', () => {

@@ -148,8 +148,9 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
       }
 
       const mapped = (data || []).map((c) => ({
-        email: c.email,
-        name: c.name || c.email,
+        id: c.id,
+        email: c.email || undefined,
+        name: c.name || c.email || 'Unknown',
         phone: c.phone || undefined,
         addedAt: c.created_at,
         lastInvitedAt: c.updated_at || c.created_at,
@@ -167,19 +168,60 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
   // Update contacts based on invitees in an event
   const updateContactsFromEvent = async (eventData: Omit<Event, 'id' | 'organizer' | 'createdAt'>) => {
     try {
-      const records = eventData.invitees.map((invitee) => ({
-        email: invitee.email,
-        owner_id: user.id,
-        name: invitee.name,
-        phone: invitee.phone,
-      }));
+      // Contacts are now created/updated on the backend when creating events
+      // This function is a fallback for local contact updates
+      
+      for (const invitee of eventData.invitees) {
+        const hasEmail = invitee.email && invitee.email.trim().length > 0;
+        const hasPhone = invitee.phone && invitee.phone.trim().length > 0;
+        
+        if (!hasEmail && !hasPhone) continue;
+        
+        const record = {
+          owner_id: user.id,
+          email: hasEmail ? invitee.email!.trim() : null,
+          name: invitee.name,
+          phone: hasPhone ? invitee.phone!.trim() : null,
+        };
 
-      // Upsert per owner+email to avoid clobbering other users' contacts
-      const { error } = await supabase
-        .from('contacts')
-        .upsert(records, { onConflict: 'owner_id,email' });
-      if (error) {
-        console.error('Error upserting contacts:', error.message);
+        // Try to find existing contact by email or phone
+        let existingContact = null;
+        
+        if (hasEmail) {
+          const { data } = await supabase
+            .from('contacts')
+            .select()
+            .eq('owner_id', user.id)
+            .eq('email', invitee.email!.trim())
+            .single();
+          existingContact = data;
+        }
+        
+        if (!existingContact && hasPhone) {
+          const { data } = await supabase
+            .from('contacts')
+            .select()
+            .eq('owner_id', user.id)
+            .eq('phone', invitee.phone!.trim())
+            .single();
+          existingContact = data;
+        }
+        
+        if (existingContact) {
+          // Update existing
+          await supabase
+            .from('contacts')
+            .update({ name: invitee.name, phone: record.phone, email: record.email })
+            .eq('id', existingContact.id);
+        } else {
+          // Insert new
+          const { error } = await supabase
+            .from('contacts')
+            .insert(record);
+          if (error) {
+            console.error('Error inserting contact:', error.message);
+          }
+        }
       }
 
       await fetchContacts();
@@ -189,13 +231,13 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
   };
 
   // Delete a contact
-  const handleDeleteContact = (email: string) => {
+  const handleDeleteContact = (contactId: string) => {
     const performDelete = async () => {
       try {
         const { error } = await supabase
           .from('contacts')
           .delete()
-          .eq('email', email)
+          .eq('id', contactId)
           .eq('owner_id', user.id);
 
         if (error) {
@@ -204,8 +246,8 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
           return;
         }
 
-        setContacts((prev) => prev.filter((c) => c.email.toLowerCase() !== email.toLowerCase()));
-        console.log('✅ Contact deleted:', email);
+        setContacts((prev) => prev.filter((c) => c.id !== contactId));
+        console.log('✅ Contact deleted:', contactId);
       } catch (error) {
         console.error('Unexpected error deleting contact:', error);
         alert('An error occurred while deleting the contact.');
@@ -378,13 +420,17 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
 
   // Get all unique invitees from all events
   const getAllInvitees = () => {
-    const inviteeMap = new Map<string, { email: string; name: string }>();
+    const inviteeMap = new Map<string, { identifier: string; email?: string; phone?: string; name: string }>();
     
     events.forEach(event => {
       event.invitees.forEach(invitee => {
-        if (!inviteeMap.has(invitee.email)) {
-          inviteeMap.set(invitee.email, {
+        // Use email or phone as identifier
+        const identifier = invitee.email || invitee.phone || '';
+        if (identifier && !inviteeMap.has(identifier)) {
+          inviteeMap.set(identifier, {
+            identifier,
             email: invitee.email,
+            phone: invitee.phone,
             name: invitee.name,
           });
         }
@@ -466,7 +512,10 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
     // Apply invitee filtering
     if (selectedInvitees.length > 0) {
       eventsToFilter = eventsToFilter.filter(event => 
-        event.invitees.some(invitee => selectedInvitees.includes(invitee.email))
+        event.invitees.some(invitee => {
+          const identifier = invitee.email || invitee.phone || '';
+          return selectedInvitees.includes(identifier);
+        })
       );
     }
 
@@ -655,20 +704,20 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                           <div className="space-y-2">
                             {getAllInvitees().map((invitee) => (
                               <button
-                                key={invitee.email}
-                                onClick={() => toggleInviteeSelection(invitee.email)}
-                                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border-2 transition-all ${ selectedInvitees.includes(invitee.email)
+                                key={invitee.identifier}
+                                onClick={() => toggleInviteeSelection(invitee.identifier)}
+                                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border-2 transition-all ${ selectedInvitees.includes(invitee.identifier)
                                     ? 'border-indigo-500 bg-indigo-50'
                                     : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
                                 }`}
                               >
                                 <div className="flex items-center gap-3">
                                   <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                                    selectedInvitees.includes(invitee.email)
+                                    selectedInvitees.includes(invitee.identifier)
                                       ? 'border-indigo-600 bg-indigo-600'
                                       : 'border-gray-300'
                                   }`}>
-                                    {selectedInvitees.includes(invitee.email) && (
+                                    {selectedInvitees.includes(invitee.identifier) && (
                                       <svg className="w-3 h-3 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
                                         <path d="M5 13l4 4L19 7"></path>
                                       </svg>
@@ -678,7 +727,7 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                                     <p className="text-sm font-medium text-gray-900">
                                       {invitee.name}
                                     </p>
-                                    <p className="text-xs text-gray-500">{invitee.email}</p>
+                                    <p className="text-xs text-gray-500">{invitee.email || invitee.phone}</p>
                                   </div>
                                 </div>
                               </button>
