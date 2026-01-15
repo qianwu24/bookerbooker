@@ -393,10 +393,10 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
 
   // Update invitee status
   const { data: invitee, error: inviteeError } = await supabase
-    .from('invitees')
-    .select('*')
+    .from('event_invitees')
+    .select('*, contact:contacts!inner(email, name, owner_id)')
     .eq('event_id', eventId)
-    .eq('email', inviteeEmail)
+    .eq('contact.email', inviteeEmail)
     .single();
 
   if (inviteeError || !invitee) {
@@ -407,10 +407,10 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
   const newStatus = action === 'confirm' ? 'accepted' : 'declined';
 
   const { error: updateError } = await supabase
-    .from('invitees')
-    .update({ status: newStatus, updated_at: new Date().toISOString() })
+    .from('event_invitees')
+    .update({ status: newStatus, responded_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq('event_id', eventId)
-    .eq('email', inviteeEmail);
+    .eq('contact_id', invitee.contact_id);
 
   if (updateError) {
     return c.json({ error: updateError.message }, 400);
@@ -462,8 +462,8 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
   // If declined, promote next pending invitee
   if (newStatus === 'declined') {
     const { data: nextInvitee } = await supabase
-      .from('invitees')
-      .select('*')
+      .from('event_invitees')
+      .select('*, contact:contacts!inner(email, name)')
       .eq('event_id', eventId)
       .eq('status', 'pending')
       .gt('priority', invitee.priority)
@@ -473,7 +473,7 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
 
     if (nextInvitee) {
       await supabase
-        .from('invitees')
+        .from('event_invitees')
         .update({
           status: 'invited',
           invited_at: new Date().toISOString(),
@@ -483,19 +483,19 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
 
       // Send invite to promoted
       await sendInviteEmail(
-        { email: nextInvitee.email, name: nextInvitee.name },
+        { email: nextInvitee.contact.email, name: nextInvitee.contact.name },
         {
-          title: invitee.title || 'Event Invitation',
-          date: invitee.date || '',
-          time: invitee.time || '',
-          location: invitee.location,
+          title: event?.title || 'Event Invitation',
+          date: event?.date || '',
+          time: event?.time || '',
+          location: event?.location,
           timeZone: event?.time_zone,
           durationMinutes: event?.duration_minutes,
-          organizerName: invitee.organizerName,
-          notes: invitee.notes || '—',
-          orgName: invitee.organizerName || 'Booker',
-          confirmUrl: (await buildRsvpUrls(eventId, nextInvitee.email)).confirmUrl,
-          declineUrl: (await buildRsvpUrls(eventId, nextInvitee.email)).declineUrl,
+          organizerName: event?.organizer?.name,
+          notes: event?.description || '—',
+          orgName: event?.organizer?.name || 'Booker',
+          confirmUrl: (await buildRsvpUrls(eventId, nextInvitee.contact.email)).confirmUrl,
+          declineUrl: (await buildRsvpUrls(eventId, nextInvitee.contact.email)).declineUrl,
         },
       );
     }
@@ -681,42 +681,62 @@ app.post("/make-server-37f8437f/events", async (c) => {
       return c.json({ error: eventError.message }, 400);
     }
     
-    // Add invitees
+    // Add invitees: upsert contacts and link via event_invitees
     const invitedNow: any[] = [];
     const notices: string[] = [];
     if (eventData.invitees && eventData.invitees.length > 0) {
       const isPriorityMode = eventData.inviteMode === 'priority';
       const invitedAt = new Date().toISOString();
 
+      // Upsert contacts per owner/email
+      const contactPayload = eventData.invitees.map((invitee: any) => ({
+        owner_id: user.id,
+        email: invitee.email,
+        name: invitee.name,
+        phone: invitee.phone ?? null,
+      }));
+
+      const { data: contacts, error: contactError } = await supabase
+        .from('contacts')
+        .upsert(contactPayload, { onConflict: 'owner_id,email' })
+        .select();
+
+      if (contactError) {
+        console.log('Error upserting contacts:', contactError);
+      }
+
+      const contactMap = new Map<string, any>();
+      (contacts || []).forEach((c: any) => contactMap.set(c.email, c));
+
       const inviteesData = eventData.invitees.map((invitee: any, index: number) => {
         const status = isPriorityMode
           ? (index === 0 ? 'invited' : 'pending')
           : 'invited';
 
+        const contact = contactMap.get(invitee.email);
+
         return {
           event_id: event.id,
-          email: invitee.email,
-          name: invitee.name,
-          priority: invitee.priority ?? index,
+          contact_id: contact?.id,
           status,
+          priority: invitee.priority ?? index,
           invited_at: status === 'invited' ? invitedAt : null,
         };
-      });
+      }).filter((inv: any) => inv.contact_id);
       
-      const { data: upsertedInvitees, error: inviteesError } = await supabase
-        .from('invitees')
-        .upsert(inviteesData, { onConflict: 'event_id,email', ignoreDuplicates: false })
-        .select();
+      const { data: insertedLinks, error: inviteesError } = await supabase
+        .from('event_invitees')
+        .upsert(inviteesData, { onConflict: 'event_id,contact_id', ignoreDuplicates: false })
+        .select(`*, contact:contacts(id, email, name)`);
       
       if (inviteesError) {
         console.log('Error adding invitees:', inviteesError);
         // Don't fail the whole request, event was created
       } else {
-        const inviteSource = upsertedInvitees || inviteesData;
-        if (upsertedInvitees && upsertedInvitees.length < inviteesData.length) {
+        const inviteSource = insertedLinks || inviteesData;
+        if (insertedLinks && insertedLinks.length < inviteesData.length) {
           notices.push('Some invitees already existed for this event and were updated.');
         }
-        // Send to everyone we just marked as invited (priority mode only sends the first one initially)
         invitedNow.push(...inviteSource.filter((inv: any) => inv.status === 'invited'));
       }
     }
@@ -727,7 +747,12 @@ app.post("/make-server-37f8437f/events", async (c) => {
       .select(`
         *,
         organizer:users!events_organizer_id_fkey(id, email, name, avatar_url),
-        invitees(*)
+        invitees:event_invitees (
+          status,
+          priority,
+          invited_at,
+          contact:contacts!event_invitees_contact_id_fkey (id, email, name, phone)
+        )
       `)
       .eq('id', event.id)
       .single();
@@ -749,8 +774,8 @@ app.post("/make-server-37f8437f/events", async (c) => {
         name: fullEvent.organizer.name,
       },
       invitees: fullEvent.invitees.map((inv: any) => ({
-        email: inv.email,
-        name: inv.name,
+        email: inv.contact.email,
+        name: inv.contact.name,
         priority: inv.priority,
         status: inv.status,
         invitedAt: inv.invited_at,
@@ -781,9 +806,12 @@ app.post("/make-server-37f8437f/events", async (c) => {
     // Invitees
     if (invitedNow.length > 0) {
       await Promise.all(invitedNow.map(async (inv) => {
-        const urls = await buildRsvpUrls(responseEvent.id, inv.email);
+        const email = inv.contact?.email || inv.email;
+        const name = inv.contact?.name || inv.name;
+        if (!email) return;
+        const urls = await buildRsvpUrls(responseEvent.id, email);
         await sendInviteEmail(
-          { email: inv.email, name: inv.name },
+          { email, name },
           {
             title: responseEvent.title,
             date: responseEvent.date,
@@ -825,7 +853,12 @@ app.get("/make-server-37f8437f/events", async (c) => {
       .select(`
         *,
         organizer:users!events_organizer_id_fkey(id, email, name, avatar_url),
-        invitees(*)
+        invitees:event_invitees (
+          status,
+          priority,
+          invited_at,
+          contact:contacts!event_invitees_contact_id_fkey (id, email, name, phone)
+        )
       `)
       .eq('organizer_id', user.id);
     
@@ -835,9 +868,10 @@ app.get("/make-server-37f8437f/events", async (c) => {
     
     // Get event IDs where user is invited
     const { data: invitedEventIds } = await supabase
-      .from('invitees')
-      .select('event_id')
-      .eq('email', user.email);
+      .from('event_invitees')
+      .select('event_id, contact:contacts!inner(email, owner_id)')
+      .eq('contact.email', user.email)
+      .eq('contact.owner_id', user.id);
     
     let invitedEvents: any[] = [];
     if (invitedEventIds && invitedEventIds.length > 0) {
@@ -847,7 +881,12 @@ app.get("/make-server-37f8437f/events", async (c) => {
         .select(`
           *,
           organizer:users!events_organizer_id_fkey(id, email, name, avatar_url),
-          invitees(*)
+          invitees:event_invitees (
+            status,
+            priority,
+            invited_at,
+            contact:contacts!event_invitees_contact_id_fkey (id, email, name, phone)
+          )
         `)
         .in('id', ids)
         .neq('organizer_id', user.id);
@@ -872,8 +911,8 @@ app.get("/make-server-37f8437f/events", async (c) => {
         name: event.organizer.name,
       },
       invitees: (event.invitees || []).map((inv: any) => ({
-        email: inv.email,
-        name: inv.name,
+        email: inv.contact.email,
+        name: inv.contact.name,
         priority: inv.priority,
         status: inv.status,
       })),
@@ -910,22 +949,38 @@ app.put("/make-server-37f8437f/events/:eventId/invitees/:inviteeEmail/status", a
     
     // Get the invitee record
     const { data: invitee, error: inviteeError } = await supabase
-      .from('invitees')
-      .select('*')
+      .from('event_invitees')
+      .select('*, contact:contacts!inner(email, name, id)')
       .eq('event_id', eventId)
-      .eq('email', inviteeEmail)
+      .eq('contact.email', inviteeEmail)
       .single();
     
     if (inviteeError || !invitee) {
       return c.json({ error: 'Invitee not found' }, 404);
     }
     
+    // Fetch event upfront for later notifications
+    const { data: event } = await supabase
+      .from('events')
+      .select(`
+        *,
+        organizer:users!events_organizer_id_fkey(id, email, name, avatar_url),
+        invitees:event_invitees (
+          status,
+          priority,
+          invited_at,
+          contact:contacts!event_invitees_contact_id_fkey (id, email, name, phone)
+        )
+      `)
+      .eq('id', eventId)
+      .single();
+
     // Update the invitee status
     const { error: updateError } = await supabase
-      .from('invitees')
-      .update({ status, updated_at: new Date().toISOString() })
+      .from('event_invitees')
+      .update({ status, responded_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq('event_id', eventId)
-      .eq('email', inviteeEmail);
+      .eq('contact_id', invitee.contact_id);
     
     if (updateError) {
       console.log('Error updating invitee status:', updateError);
@@ -936,8 +991,8 @@ app.put("/make-server-37f8437f/events/:eventId/invitees/:inviteeEmail/status", a
     if (status === 'declined') {
       // Find next pending invitee with higher priority number (lower priority)
       const { data: nextInvitee } = await supabase
-        .from('invitees')
-        .select('*')
+        .from('event_invitees')
+        .select('*, contact:contacts!inner(email, name)')
         .eq('event_id', eventId)
         .eq('status', 'pending')
         .gt('priority', invitee.priority)
@@ -947,13 +1002,13 @@ app.put("/make-server-37f8437f/events/:eventId/invitees/:inviteeEmail/status", a
       
       if (nextInvitee) {
         await supabase
-          .from('invitees')
-          .update({ status: 'invited', updated_at: new Date().toISOString() })
+          .from('event_invitees')
+          .update({ status: 'invited', invited_at: new Date().toISOString(), updated_at: new Date().toISOString() })
           .eq('id', nextInvitee.id);
 
         // Send invite to the promoted invitee
         await sendInviteEmail(
-          { email: nextInvitee.email, name: nextInvitee.name },
+          { email: nextInvitee.contact.email, name: nextInvitee.contact.name },
           {
             title: event?.title || 'Event Invitation',
             date: event?.date || '',
@@ -964,24 +1019,14 @@ app.put("/make-server-37f8437f/events/:eventId/invitees/:inviteeEmail/status", a
             organizerName: event?.organizer?.name,
             notes: event?.description || '—',
             orgName: event?.organizer?.name || 'Booker',
-            confirmUrl: (await buildRsvpUrls(eventId, nextInvitee.email)).confirmUrl,
-            declineUrl: (await buildRsvpUrls(eventId, nextInvitee.email)).declineUrl,
+            confirmUrl: (await buildRsvpUrls(eventId, nextInvitee.contact.email)).confirmUrl,
+            declineUrl: (await buildRsvpUrls(eventId, nextInvitee.contact.email)).declineUrl,
           },
         );
       }
     }
     
     // Fetch the updated event
-    const { data: event } = await supabase
-      .from('events')
-      .select(`
-        *,
-        organizer:users!events_organizer_id_fkey(id, email, name, avatar_url),
-        invitees(*)
-      `)
-      .eq('id', eventId)
-      .single();
-    
     if (!event) {
       return c.json({ error: 'Event not found' }, 404);
     }
@@ -999,8 +1044,8 @@ app.put("/make-server-37f8437f/events/:eventId/invitees/:inviteeEmail/status", a
         name: event.organizer.name,
       },
       invitees: event.invitees.map((inv: any) => ({
-        email: inv.email,
-        name: inv.name,
+        email: inv.contact.email,
+        name: inv.contact.name,
         priority: inv.priority,
         status: inv.status,
       })),
