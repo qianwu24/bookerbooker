@@ -228,6 +228,22 @@ const buildResultPage = (options: {
   </html>`;
 };
 
+// Rate limit helper: Resend free tier only allows 1 email/second
+// This helper adds a delay between consecutive emails
+const RESEND_RATE_LIMIT_MS = 1100; // 1.1 seconds to be safe
+let lastEmailSentAt = 0;
+
+const waitForRateLimit = async (): Promise<void> => {
+  const now = Date.now();
+  const timeSinceLastEmail = now - lastEmailSentAt;
+  if (lastEmailSentAt > 0 && timeSinceLastEmail < RESEND_RATE_LIMIT_MS) {
+    const waitTime = RESEND_RATE_LIMIT_MS - timeSinceLastEmail;
+    console.log(`Rate limit: waiting ${waitTime}ms before sending next email`);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+  lastEmailSentAt = Date.now();
+};
+
 const sendInviteEmail = async (
   invitee: InviteePayload,
   event: EventEmailPayload,
@@ -239,10 +255,14 @@ const sendInviteEmail = async (
     return false;
   }
 
+  // Wait for rate limit before sending
+  await waitForRateLimit();
+
   try {
     const subject = variant === 'invite'
       ? `You're invited: ${event.title}`
       : `You're confirmed: ${event.title}`;
+
 
     const durationText = event.durationMinutes
       ? `${event.durationMinutes} minute${event.durationMinutes === 1 ? '' : 's'}`
@@ -984,12 +1004,12 @@ app.post("/make-server-37f8437f/events", async (c) => {
       },
     );
 
-    // Invitees
+    // Invitees - send sequentially to respect Resend rate limit (1 email/sec)
     if (invitedNow.length > 0) {
-      await Promise.all(invitedNow.map(async (inv) => {
+      for (const inv of invitedNow) {
         const email = inv.contact?.email || inv.email;
         const name = inv.contact?.name || inv.name;
-        if (!email) return;
+        if (!email) continue;
         const urls = await buildRsvpUrls(responseEvent.id, email);
         await sendInviteEmail(
           { email, name },
@@ -1007,7 +1027,7 @@ app.post("/make-server-37f8437f/events", async (c) => {
             declineUrl: urls.declineUrl,
           },
         );
-      }));
+      };
     }
     
     return c.json({ success: true, event: responseEvent, notices: responseNotices });

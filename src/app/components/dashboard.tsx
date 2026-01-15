@@ -969,20 +969,20 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                   )}
                 </div>
 
-                {/* Clear No-Show Events Button */}
-                <button
-                  onClick={() => setShowClearNoShowDialog(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-white text-red-600 border border-red-200 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors"
-                  title="Delete past events with no confirmed attendees"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Clear No-Shows
-                  {getNoShowEvents().length > 0 && (
+                {/* Clear No-Show Events Button - only show if there are no-shows */}
+                {getNoShowEvents().length > 0 && (
+                  <button
+                    onClick={() => setShowClearNoShowDialog(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-white text-red-600 border border-red-200 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors"
+                    title="Delete past events with no confirmed attendees"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Clear No-Shows
                     <span className="ml-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
                       {getNoShowEvents().length}
                     </span>
-                  )}
-                </button>
+                  </button>
+                )}
               </div>
             </div>
             

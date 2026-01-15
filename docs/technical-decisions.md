@@ -42,5 +42,16 @@
 - If using auto-promote, create a schedule (e.g., every 10 minutes) hitting `/make-server-37f8437f/cron/auto-promote`.
 - Consider adding reminders before auto-decline and observability logs/metrics.
 
+## Resend Rate Limit Workaround
+Resend free tier only allows 1 email/second. To avoid failures when sending multiple emails:
+- Added `waitForRateLimit()` helper that enforces 1.1s delay between emails
+- Changed `Promise.all()` to sequential `for...of` loop for batch invites
+- Rate limit is applied globally in `sendInviteEmail()` function
+- **Trade-off:** Slower email sending, but reliable on free tier
+- **Future:** Upgrade to Resend paid plan or migrate to Twilio SendGrid for higher throughput
+
 ## TODO
 - Update Google OAuth app to show "continue to bookerbooker.com" (set App name/domain, authorized domain, and replace client ID/secret in Supabase Google provider).
+- SMS support - integrate Twilio for sending SMS invitations (Twilio CLI setup complete, phone: +12566675941)
+- Refine confirmation click UI - improve the user experience when invitee clicks to accept
+- Refine decline click UI - improve the user experience when invitee clicks to decline
