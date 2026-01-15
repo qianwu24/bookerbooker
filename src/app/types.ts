@@ -2,7 +2,7 @@ export type InviteeStatus = 'pending' | 'invited' | 'accepted' | 'declined';
 
 export type InviteMode = 'priority' | 'first-come-first-serve';
 
-export type EventStatus = 'completed' | 'no-show' | 'approaching' | 'future';
+export type EventStatus = 'completed' | 'no-show' | 'approaching' | 'scheduled' | 'future';
 
 export interface Invitee {
   email: string;

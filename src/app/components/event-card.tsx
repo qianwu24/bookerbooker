@@ -89,6 +89,8 @@ export function EventCard({
         return 'border-gray-300 bg-gray-50 opacity-75';
       case 'approaching':
         return 'border-orange-300 bg-orange-50/30';
+      case 'scheduled':
+        return 'border-green-300 bg-green-50/30';
       case 'future':
       default:
         return 'border-gray-200 bg-white';
@@ -125,6 +127,13 @@ export function EventCard({
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-sm font-medium">
             <AlertCircle className="w-4 h-4" />
             <span>Approaching</span>
+          </div>
+        );
+      case 'scheduled':
+        return (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium">
+            <CheckCircle className="w-4 h-4" />
+            <span>Scheduled</span>
           </div>
         );
       case 'future':

@@ -21,13 +21,18 @@ const calculateEventStatus = (event: Event): EventStatus => {
   // Check if event has passed
   const hasPassed = eventDateTime < now;
   
+  // Check if anyone accepted (event is scheduled/confirmed)
+  const hasAccepted = event.invitees.some(inv => inv.status === 'accepted');
+  
   if (hasPassed) {
-    // Check if anyone accepted
-    const hasAccepted = event.invitees.some(inv => inv.status === 'accepted');
     return hasAccepted ? 'completed' : 'no-show';
   }
   
-  // Future events
+  // Future events - check if scheduled (has confirmed attendee)
+  if (hasAccepted) {
+    return 'scheduled';
+  }
+  
   if (hoursUntilEvent <= 24) {
     return 'approaching';
   }
