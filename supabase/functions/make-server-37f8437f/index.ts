@@ -810,6 +810,11 @@ app.post("/make-server-37f8437f/events", async (c) => {
       `)
       .eq('id', event.id)
       .single();
+
+    if (!fullEvent) {
+      console.log('Error fetching full event after creation');
+      return c.json({ error: 'Failed to fetch created event' }, 500);
+    }
     
     // Transform to match frontend expected format
     const responseEvent = {
@@ -827,13 +832,13 @@ app.post("/make-server-37f8437f/events", async (c) => {
         email: fullEvent.organizer.email,
         name: fullEvent.organizer.name,
       },
-      invitees: fullEvent.invitees.map((inv: any) => ({
-        email: inv.contact.email,
-        name: inv.contact.name,
+      invitees: (fullEvent.invitees || []).map((inv: any) => ({
+        email: inv.contact?.email,
+        name: inv.contact?.name,
         priority: inv.priority,
         status: inv.status,
         invitedAt: inv.invited_at,
-      })),
+      })).filter((inv: any) => inv.email),
       createdAt: fullEvent.created_at,
     };
     const responseNotices = eventData.invitees && eventData.invitees.length > 0 ? notices : [];
