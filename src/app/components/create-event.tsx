@@ -17,6 +17,7 @@ export function CreateEvent({
   onCreateEvent,
   onCancel,
 }: CreateEventProps) {
+  const locationKey = `booker_recent_locations_${currentUser.email}`;
   const [title, setTitle] = useState('Tennis Match');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
@@ -38,17 +39,25 @@ export function CreateEvent({
 
   // Load cached locations on mount
   useEffect(() => {
-    const stored = localStorage.getItem('booker_recent_locations');
-    if (stored) {
+    const readKey = (key: string) => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return [] as string[];
       try {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setLocationHistory(parsed);
-        }
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
       } catch (err) {
         console.error('Failed to parse cached locations', err);
+        return [];
       }
-    }
+    };
+
+    // Migrate any legacy shared locations once
+    const legacy = readKey('booker_recent_locations');
+    const userScoped = readKey(locationKey);
+    const merged = [...legacy, ...userScoped].filter(Boolean);
+    const unique = Array.from(new Set(merged)).slice(0, 5);
+    setLocationHistory(unique);
+    localStorage.setItem(locationKey, JSON.stringify(unique));
   }, []);
 
   // Email validation helper
@@ -71,7 +80,7 @@ export function CreateEvent({
     if (!clean) return;
     const next = [clean, ...locationHistory.filter((l) => l !== clean)].slice(0, 5);
     setLocationHistory(next);
-    localStorage.setItem('booker_recent_locations', JSON.stringify(next));
+    localStorage.setItem(locationKey, JSON.stringify(next));
     setShowRecentLocations(false);
   };
 
