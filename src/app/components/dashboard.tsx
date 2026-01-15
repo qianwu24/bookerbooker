@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, LogOut, Plus, User, X, Filter, Users, Settings, CheckCircle, Trash2 } from 'lucide-react';
+import { Calendar, LogOut, Plus, User, X, Filter, Users, Settings, CheckCircle, Trash2, Phone, Loader2 } from 'lucide-react';
 import { CreateEvent } from './create-event';
 import { EventList } from './event-list';
 import { ContactList } from './contact-list';
@@ -42,6 +42,9 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
   const [clearingNoShows, setClearingNoShows] = useState(false);
   const [hasMoreEvents, setHasMoreEvents] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [userPhone, setUserPhone] = useState<string>('');
+  const [savingPhone, setSavingPhone] = useState(false);
+  const [phoneSaveMessage, setPhoneSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const EVENTS_PER_PAGE = 10;
 
   // Helper function to get fresh access token
@@ -99,6 +102,7 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
 
     fetchEvents();
     fetchContacts();
+    fetchUserPhone();
     testBackendConnection();
 
     // Refresh timezone from browser (approx IP/device derived)
@@ -160,6 +164,54 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
     if (loadingMore || !hasMoreEvents) return;
     setLoadingMore(true);
     await fetchEvents(false);
+  };
+
+  const fetchUserPhone = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('phone')
+        .eq('id', user.id)
+        .single();
+      
+      if (!error && data?.phone) {
+        setUserPhone(data.phone);
+      }
+    } catch (error) {
+      console.error('Error fetching user phone:', error);
+    }
+  };
+
+  const saveUserPhone = async () => {
+    setSavingPhone(true);
+    setPhoneSaveMessage(null);
+    
+    try {
+      // Basic phone validation - allow empty or valid format
+      const cleanPhone = userPhone.replace(/\D/g, '');
+      if (userPhone && cleanPhone.length < 10) {
+        setPhoneSaveMessage({ type: 'error', text: 'Please enter a valid phone number' });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .update({ phone: userPhone || null })
+        .eq('id', user.id);
+      
+      if (error) {
+        console.error('Error saving phone:', error);
+        setPhoneSaveMessage({ type: 'error', text: 'Failed to save phone number' });
+      } else {
+        setPhoneSaveMessage({ type: 'success', text: 'Phone number saved!' });
+        setTimeout(() => setPhoneSaveMessage(null), 3000);
+      }
+    } catch (error) {
+      console.error('Error saving phone:', error);
+      setPhoneSaveMessage({ type: 'error', text: 'An error occurred' });
+    } finally {
+      setSavingPhone(false);
+    }
   };
 
   const fetchContacts = async () => {
@@ -1158,6 +1210,45 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                   <option value={timeZone}>{timeZone}</option>
                 )}
               </select>
+            </div>
+
+            {/* Phone Number for SMS Notifications */}
+            <div className="p-4 border border-gray-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Phone className="w-4 h-4 text-indigo-600" />
+                <p className="text-sm font-semibold text-gray-900">Phone Number (SMS)</p>
+              </div>
+              <p className="text-xs text-gray-600 mb-3">
+                Add your phone number to receive SMS notifications as an event organizer.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  value={userPhone}
+                  onChange={(e) => setUserPhone(e.target.value)}
+                  placeholder="+1 (555) 123-4567"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                />
+                <button
+                  onClick={saveUserPhone}
+                  disabled={savingPhone}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {savingPhone ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save'
+                  )}
+                </button>
+              </div>
+              {phoneSaveMessage && (
+                <p className={`mt-2 text-xs ${phoneSaveMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                  {phoneSaveMessage.text}
+                </p>
+              )}
             </div>
 
             <div className="flex justify-end">

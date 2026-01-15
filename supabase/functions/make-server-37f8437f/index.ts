@@ -39,6 +39,11 @@ const FUNCTION_BASE_URL = Deno.env.get('FUNCTION_BASE_URL') ||
 const RSVP_SECRET = Deno.env.get('RSVP_SECRET') || 'dev-secret-change-me';
 const DEFAULT_AUTO_PROMOTE_MINUTES = 30;
 
+// Twilio SMS configuration
+const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
+const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
+const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
+
 type InviteePayload = {
   email: string;
   name?: string;
@@ -413,6 +418,213 @@ const sendInviteEmail = async (
     console.log('Error sending invite email:', error);
     return false;
   }
+};
+
+// --- SMS Functions (Twilio) ---
+
+interface SmsPayload {
+  to: string;      // Phone number in E.164 format (+1XXXXXXXXXX)
+  message: string; // SMS body (keep under 160 chars for single segment)
+}
+
+/**
+ * Send SMS via Twilio
+ */
+const sendSms = async (payload: SmsPayload): Promise<boolean> => {
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
+    console.log('SMS not sent: Twilio credentials not configured');
+    return false;
+  }
+
+  try {
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+    const auth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
+
+    const formData = new URLSearchParams();
+    formData.append('To', payload.to);
+    formData.append('From', TWILIO_PHONE_NUMBER);
+    formData.append('Body', payload.message);
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString(),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.log('Twilio SMS failed:', res.status, res.statusText, errText);
+      return false;
+    }
+
+    const data = await res.json();
+    console.log('SMS sent successfully:', { sid: data.sid, to: payload.to });
+    return true;
+  } catch (error) {
+    console.log('Error sending SMS:', error);
+    return false;
+  }
+};
+
+// SMS Template helpers
+const formatDateForSms = (dateStr: string): string => {
+  const date = new Date(dateStr + 'T00:00:00');
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+const formatTimeForSms = (timeStr: string): string => {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hour12 = hours % 12 || 12;
+  return `${hour12}:${minutes.toString().padStart(2, '0')} ${period}`;
+};
+
+interface EventSmsData {
+  eventId: string;
+  eventTitle: string;
+  eventDate: string;
+  eventTime: string;
+  location?: string;
+  organizerName: string;
+  inviteeName?: string;
+}
+
+/**
+ * Get invitation SMS message
+ */
+const getInvitationSmsMessage = (data: EventSmsData): string => {
+  const locationPart = data.location ? ` at ${data.location}` : '';
+  return `📅 ${data.organizerName} invited you to "${data.eventTitle}" on ${formatDateForSms(data.eventDate)} at ${formatTimeForSms(data.eventTime)}${locationPart}.\n\nReply Y to confirm, N to decline.`;
+};
+
+/**
+ * Get confirmation SMS for invitee
+ */
+const getInviteeConfirmationSmsMessage = (data: EventSmsData): string => {
+  const locationPart = data.location ? ` at ${data.location}` : '';
+  return `✅ You're confirmed for "${data.eventTitle}" on ${formatDateForSms(data.eventDate)} at ${formatTimeForSms(data.eventTime)}${locationPart}. See you there!`;
+};
+
+/**
+ * Get confirmation SMS for organizer
+ */
+const getOrganizerConfirmationSmsMessage = (data: EventSmsData): string => {
+  return `🎉 ${data.inviteeName || 'Someone'} confirmed for "${data.eventTitle}" on ${formatDateForSms(data.eventDate)} at ${formatTimeForSms(data.eventTime)}.`;
+};
+
+/**
+ * Get decline SMS for organizer
+ */
+const getOrganizerDeclineSmsMessage = (data: EventSmsData): string => {
+  return `❌ ${data.inviteeName || 'Someone'} declined "${data.eventTitle}" on ${formatDateForSms(data.eventDate)}.`;
+};
+
+/**
+ * Get reminder SMS for invitee
+ */
+const getInviteeReminderSmsMessage = (data: EventSmsData): string => {
+  const locationPart = data.location ? ` at ${data.location}` : '';
+  return `⏰ Reminder: "${data.eventTitle}" starts in 1 hour (${formatTimeForSms(data.eventTime)})${locationPart}. See you soon!`;
+};
+
+/**
+ * Get reminder SMS for organizer
+ */
+const getOrganizerReminderSmsMessage = (data: EventSmsData): string => {
+  const locationPart = data.location ? ` at ${data.location}` : '';
+  return `⏰ Reminder: Your event "${data.eventTitle}" starts in 1 hour (${formatTimeForSms(data.eventTime)})${locationPart}.`;
+};
+
+/**
+ * Send invitation SMS to invitee
+ */
+const sendInvitationSms = async (
+  phone: string,
+  eventData: EventSmsData
+): Promise<boolean> => {
+  const message = getInvitationSmsMessage(eventData);
+  return sendSms({ to: phone, message });
+};
+
+/**
+ * Send confirmation SMS to invitee
+ */
+const sendInviteeConfirmationSms = async (
+  phone: string,
+  eventData: EventSmsData
+): Promise<boolean> => {
+  const message = getInviteeConfirmationSmsMessage(eventData);
+  return sendSms({ to: phone, message });
+};
+
+/**
+ * Send confirmation notification SMS to organizer
+ */
+const sendOrganizerConfirmationSms = async (
+  phone: string,
+  eventData: EventSmsData
+): Promise<boolean> => {
+  const message = getOrganizerConfirmationSmsMessage(eventData);
+  return sendSms({ to: phone, message });
+};
+
+/**
+ * Send decline notification SMS to organizer
+ */
+const sendOrganizerDeclineSms = async (
+  phone: string,
+  eventData: EventSmsData
+): Promise<boolean> => {
+  const message = getOrganizerDeclineSmsMessage(eventData);
+  return sendSms({ to: phone, message });
+};
+
+/**
+ * Send reminder SMS to invitee
+ */
+const sendInviteeReminderSms = async (
+  phone: string,
+  eventData: EventSmsData
+): Promise<boolean> => {
+  const message = getInviteeReminderSmsMessage(eventData);
+  return sendSms({ to: phone, message });
+};
+
+/**
+ * Send reminder SMS to organizer
+ */
+const sendOrganizerReminderSms = async (
+  phone: string,
+  eventData: EventSmsData
+): Promise<boolean> => {
+  const message = getOrganizerReminderSmsMessage(eventData);
+  return sendSms({ to: phone, message });
+};
+
+/**
+ * Parse Y/N reply from incoming SMS
+ */
+const parseReplyStatus = (message: string): 'accepted' | 'declined' | null => {
+  const normalized = message.trim().toUpperCase();
+  
+  // Accept variations of Yes
+  if (['Y', 'YES', 'YEP', 'YA', 'YEAH', 'YUP', 'CONFIRM', 'OK', 'OKAY', 'SURE'].includes(normalized)) {
+    return 'accepted';
+  }
+  
+  // Accept variations of No
+  if (['N', 'NO', 'NOPE', 'NAH', 'DECLINE', 'CANCEL', 'CANT', "CAN'T", 'CANNOT'].includes(normalized)) {
+    return 'declined';
+  }
+  
+  return null;
 };
 
 // Helper function to get authenticated user
@@ -1304,6 +1516,172 @@ app.delete("/make-server-37f8437f/events/:eventId", async (c) => {
   } catch (error) {
     console.log('Error deleting event:', error);
     return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// --- Twilio SMS Webhook (Incoming SMS) ---
+// This endpoint receives incoming SMS messages from Twilio
+// Users can reply Y/N to confirm/decline event invitations
+app.post("/make-server-37f8437f/sms/webhook", async (c) => {
+  try {
+    // Parse the incoming SMS from Twilio (application/x-www-form-urlencoded)
+    const formData = await c.req.parseBody();
+    const from = formData['From'] as string; // Phone number of sender
+    const body = formData['Body'] as string; // SMS message body
+    const messageSid = formData['MessageSid'] as string;
+
+    console.log('Incoming SMS:', { from, body, messageSid });
+
+    if (!from || !body) {
+      // Return TwiML response with error
+      return c.text('<?xml version="1.0" encoding="UTF-8"?><Response><Message>Invalid request</Message></Response>', 200, {
+        'Content-Type': 'text/xml',
+      });
+    }
+
+    const supabase = getServiceClient();
+
+    // Normalize phone number (remove any spaces/dashes)
+    const normalizedPhone = from.replace(/[^\d+]/g, '');
+
+    // Find the contact with this phone number who has a pending invitation
+    // We look for the most recent pending/invited invitation for this phone
+    const { data: pendingInvites, error: inviteError } = await supabase
+      .from('event_invitees')
+      .select(`
+        id,
+        event_id,
+        status,
+        contact:contacts!inner (
+          id,
+          phone,
+          email,
+          name,
+          owner_id
+        ),
+        event:events!inner (
+          id,
+          title,
+          date,
+          time,
+          location,
+          organizer_id,
+          organizer:users!events_organizer_id_fkey (
+            id,
+            email,
+            name,
+            phone
+          )
+        )
+      `)
+      .or(`status.eq.invited,status.eq.pending`)
+      .order('invited_at', { ascending: false });
+
+    if (inviteError) {
+      console.log('Error finding pending invites:', inviteError);
+      return c.text('<?xml version="1.0" encoding="UTF-8"?><Response><Message>Error processing your request. Please try again.</Message></Response>', 200, {
+        'Content-Type': 'text/xml',
+      });
+    }
+
+    // Find invitation matching the phone number
+    const matchingInvite = pendingInvites?.find((inv: any) => {
+      const contactPhone = inv.contact?.phone?.replace(/[^\d+]/g, '');
+      return contactPhone === normalizedPhone;
+    });
+
+    if (!matchingInvite) {
+      return c.text('<?xml version="1.0" encoding="UTF-8"?><Response><Message>You don\'t have any pending event invitations to respond to.</Message></Response>', 200, {
+        'Content-Type': 'text/xml',
+      });
+    }
+
+    // Parse the reply (Y/N)
+    const newStatus = parseReplyStatus(body);
+
+    if (!newStatus) {
+      return c.text('<?xml version="1.0" encoding="UTF-8"?><Response><Message>Sorry, I didn\'t understand that. Reply Y to confirm or N to decline your event invitation.</Message></Response>', 200, {
+        'Content-Type': 'text/xml',
+      });
+    }
+
+    const event = matchingInvite.event as any;
+    const contact = matchingInvite.contact as any;
+    const organizer = event.organizer as any;
+
+    // Update the invitee status
+    const { error: updateError } = await supabase
+      .from('event_invitees')
+      .update({ status: newStatus })
+      .eq('id', matchingInvite.id);
+
+    if (updateError) {
+      console.log('Error updating invitee status:', updateError);
+      return c.text('<?xml version="1.0" encoding="UTF-8"?><Response><Message>Error updating your RSVP. Please try again.</Message></Response>', 200, {
+        'Content-Type': 'text/xml',
+      });
+    }
+
+    // Prepare event data for SMS
+    const eventSmsData: EventSmsData = {
+      eventId: event.id,
+      eventTitle: event.title,
+      eventDate: event.date,
+      eventTime: event.time,
+      location: event.location,
+      organizerName: organizer.name || organizer.email,
+      inviteeName: contact.name || contact.email,
+    };
+
+    // Send SMS to organizer about the response
+    if (organizer.phone) {
+      if (newStatus === 'accepted') {
+        await sendOrganizerConfirmationSms(organizer.phone, eventSmsData);
+      } else {
+        await sendOrganizerDeclineSms(organizer.phone, eventSmsData);
+      }
+    }
+
+    // Build response message
+    const responseMessage = newStatus === 'accepted'
+      ? `✅ You're confirmed for "${event.title}" on ${formatDateForSms(event.date)} at ${formatTimeForSms(event.time)}. See you there!`
+      : `Your decline has been recorded for "${event.title}". Thank you for letting us know.`;
+
+    // If user declined and this is FCFS mode, we should promote the next person in line
+    // (This logic is similar to the RSVP endpoint - you may want to trigger promotion here)
+    if (newStatus === 'declined') {
+      // Check if there's a pending invitee to promote
+      const { data: nextPending } = await supabase
+        .from('event_invitees')
+        .select('id, contact:contacts!inner(email, name, phone)')
+        .eq('event_id', event.id)
+        .eq('status', 'pending')
+        .order('priority', { ascending: true })
+        .limit(1);
+
+      if (nextPending && nextPending.length > 0) {
+        const nextInvitee = nextPending[0];
+        // Promote to invited
+        await supabase
+          .from('event_invitees')
+          .update({ status: 'invited', invited_at: new Date().toISOString() })
+          .eq('id', nextInvitee.id);
+
+        // TODO: Send invitation SMS/email to the newly promoted invitee
+        console.log('Promoted next invitee:', nextInvitee.contact);
+      }
+    }
+
+    console.log('SMS RSVP processed:', { from, status: newStatus, eventId: event.id });
+
+    return c.text(`<?xml version="1.0" encoding="UTF-8"?><Response><Message>${responseMessage}</Message></Response>`, 200, {
+      'Content-Type': 'text/xml',
+    });
+  } catch (error) {
+    console.log('Error processing SMS webhook:', error);
+    return c.text('<?xml version="1.0" encoding="UTF-8"?><Response><Message>An error occurred. Please try again later.</Message></Response>', 200, {
+      'Content-Type': 'text/xml',
+    });
   }
 });
 
