@@ -985,25 +985,7 @@ app.post("/make-server-37f8437f/events", async (c) => {
     };
     const responseNotices = eventData.invitees && eventData.invitees.length > 0 ? notices : [];
 
-    // Send creator confirmation (with ICS) and invitee invites
-    // Creator confirmation (no ICS on initial create)
-    await sendInviteEmail(
-      { email: responseEvent.organizer.email, name: responseEvent.organizer.name },
-      {
-        title: responseEvent.title,
-        date: responseEvent.date,
-        time: responseEvent.time,
-        location: responseEvent.location,
-        timeZone: responseEvent.timeZone,
-        durationMinutes: responseEvent.durationMinutes,
-        organizerName: responseEvent.organizer.name,
-        notes: responseEvent.description || '—',
-        orgName: responseEvent.organizer.name || 'Booker',
-        confirmUrl: `${APP_BASE_URL}/events/${responseEvent.id}`,
-        declineUrl: `${APP_BASE_URL}/events/${responseEvent.id}`,
-      },
-    );
-
+    // Send invitee invites only (no email to organizer on event creation)
     // Invitees - send sequentially to respect Resend rate limit (1 email/sec)
     if (invitedNow.length > 0) {
       for (const inv of invitedNow) {
