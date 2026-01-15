@@ -9,7 +9,7 @@ import { supabase } from './utils/supabase-client';
 const BETA_MODE_ENABLED = import.meta.env.VITE_BETA_MODE === 'true';
 
 export default function App() {
-  const { hasAccess, grantAccess } = useBetaAccess();
+  const { hasAccess, grantAccess, revokeAccess } = useBetaAccess();
   const [user, setUser] = useState<{
     id: string;
     email: string;
@@ -87,6 +87,10 @@ export default function App() {
       setUser(null);
       setAccessToken(null);
       setCurrentPage('home');
+      // Clear beta access on logout so password is required again
+      if (BETA_MODE_ENABLED) {
+        revokeAccess();
+      }
     } catch (error) {
       console.error('Error signing out:', error);
     }
