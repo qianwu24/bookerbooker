@@ -106,6 +106,25 @@ export function CreateEvent({
     return emailRegex.test(email);
   };
 
+  // Phone validation helper (E.164 format: +1XXXXXXXXXX)
+  const isValidPhone = (phone: string): boolean => {
+    // E.164 format: + followed by 1-15 digits
+    const phoneRegex = /^\+[1-9]\d{1,14}$/;
+    return phoneRegex.test(phone.replace(/\s/g, ''));
+  };
+
+  // Format phone number hint
+  const formatPhoneHint = (phone: string): string => {
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 10) {
+      return `+1${cleaned}`;
+    }
+    if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      return `+${cleaned}`;
+    }
+    return phone;
+  };
+
   // Date/time validation helper
   const isDateTimeInFuture = (dateStr: string, timeStr: string): boolean => {
     if (!dateStr || !timeStr) return false;
@@ -141,10 +160,17 @@ export function CreateEvent({
       return;
     }
 
+    // Validate phone format if present - warn but still add
+    let validPhone = contact.phone;
+    if (contact.phone && !isValidPhone(contact.phone)) {
+      console.warn(`Contact ${contact.name} has invalid phone format: ${contact.phone}. SMS will not be sent.`);
+      validPhone = undefined; // Don't use invalid phone
+    }
+
     const newInvitee: Invitee = {
       email: contact.email,
       name: contact.name,
-      phone: contact.phone,
+      phone: validPhone,
       priority: invitees.length,
       status: inviteMode === 'first-come-first-serve' ? 'invited' : (invitees.length === 0 ? 'invited' : 'pending'),
     };
@@ -183,6 +209,14 @@ export function CreateEvent({
     // Validate email format if provided
     if (hasEmail && !isValidEmail(newInviteeEmail.trim())) {
       setErrors({ ...newErrors, inviteeEmail: 'Please enter a valid email address' });
+      return;
+    }
+    
+    // Validate phone format if provided (E.164: +1XXXXXXXXXX)
+    if (hasPhone && !isValidPhone(newInviteePhone.trim())) {
+      const hint = formatPhoneHint(newInviteePhone.trim());
+      const suggestion = hint !== newInviteePhone.trim() ? ` Try: ${hint}` : '';
+      setErrors({ ...newErrors, inviteePhone: `Phone must be in E.164 format (e.g., +12025551234).${suggestion}` });
       return;
     }
     
@@ -723,8 +757,8 @@ export function CreateEvent({
                     type="tel"
                     value={newInviteePhone}
                     onChange={(e) => setNewInviteePhone(e.target.value)}
-                    placeholder="Phone (optional)"
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                    placeholder="+1234567890"
+                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none ${errors.inviteePhone ? 'border-red-500' : 'border-gray-300'}`}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -733,6 +767,7 @@ export function CreateEvent({
                     }}
                   />
                 </div>
+                {errors.inviteePhone && <p className="text-red-500 text-sm mt-1">{errors.inviteePhone}</p>}
               </div>
               <button
                 type="button"
