@@ -40,8 +40,10 @@ const RSVP_SECRET = Deno.env.get('RSVP_SECRET') || 'dev-secret-change-me';
 const DEFAULT_AUTO_PROMOTE_MINUTES = 30;
 
 // Twilio SMS configuration
+// Uses API Key authentication (API Key SID + API Secret)
 const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
-const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
+const TWILIO_API_KEY = Deno.env.get('TWILIO_API_KEY');
+const TWILIO_API_SECRET = Deno.env.get('TWILIO_API_SECRET');
 const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
 
 type InviteePayload = {
@@ -428,17 +430,18 @@ interface SmsPayload {
 }
 
 /**
- * Send SMS via Twilio
+ * Send SMS via Twilio using API Key authentication
  */
 const sendSms = async (payload: SmsPayload): Promise<boolean> => {
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_API_KEY || !TWILIO_API_SECRET || !TWILIO_PHONE_NUMBER) {
     console.log('SMS not sent: Twilio credentials not configured');
     return false;
   }
 
   try {
     const url = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
-    const auth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
+    // Use API Key + API Secret for Basic Auth (not Account SID + Auth Token)
+    const auth = btoa(`${TWILIO_API_KEY}:${TWILIO_API_SECRET}`);
 
     const formData = new URLSearchParams();
     formData.append('To', payload.to);
@@ -676,7 +679,7 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
   // Fetch all invitees for this event to check business rules
   const { data: allInvitees, error: inviteesError } = await supabase
     .from('event_invitees')
-    .select('*, contact:contacts!inner(email, name, owner_id)')
+    .select('*, contact:contacts!inner(email, name, phone, owner_id)')
     .eq('event_id', eventId);
 
   if (inviteesError || !allInvitees) {
@@ -760,7 +763,7 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
     .from('events')
     .select(`
       *,
-      organizer:users!events_organizer_id_fkey(id, email, name)
+      organizer:users!events_organizer_id_fkey(id, email, name, phone)
     `)
     .eq('id', eventId)
     .single();
@@ -798,6 +801,27 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
       },
       { variant: 'confirm' },
     );
+
+    // SMS notifications for acceptance
+    const eventSmsData: EventSmsData = {
+      eventId,
+      eventTitle: event.title,
+      eventDate: event.date,
+      eventTime: event.time,
+      location: event.location,
+      organizerName: event.organizer?.name || 'Organizer',
+      inviteeName: invitee?.contact?.name || inviteeEmail,
+    };
+
+    // Send confirmation SMS to invitee if they have a phone
+    if (invitee?.contact?.phone) {
+      await sendInviteeConfirmationSms(invitee.contact.phone, eventSmsData);
+    }
+
+    // Send notification SMS to organizer if they have a phone
+    if (event.organizer?.phone) {
+      await sendOrganizerConfirmationSms(event.organizer.phone, eventSmsData);
+    }
   }
 
   // If declined, promote next pending invitee
@@ -839,6 +863,32 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
           declineUrl: (await buildRsvpUrls(eventId, nextInvitee.contact.email)).declineUrl,
         },
       );
+
+      // Send SMS invite to promoted invitee if they have a phone
+      if (nextInvitee.contact.phone) {
+        await sendInvitationSms(nextInvitee.contact.phone, {
+          eventId,
+          eventTitle: event?.title || 'Event',
+          eventDate: event?.date || '',
+          eventTime: event?.time || '',
+          location: event?.location,
+          organizerName: event?.organizer?.name || 'Organizer',
+          inviteeName: nextInvitee.contact.name,
+        });
+      }
+    }
+
+    // Send decline notification SMS to organizer
+    if (event?.organizer?.phone) {
+      await sendOrganizerDeclineSms(event.organizer.phone, {
+        eventId,
+        eventTitle: event.title,
+        eventDate: event.date,
+        eventTime: event.time,
+        location: event.location,
+        organizerName: event.organizer.name || 'Organizer',
+        inviteeName: invitee?.contact?.name || inviteeEmail,
+      });
     }
   }
 
@@ -1203,8 +1253,11 @@ app.post("/make-server-37f8437f/events", async (c) => {
       for (const inv of invitedNow) {
         const email = inv.contact?.email || inv.email;
         const name = inv.contact?.name || inv.name;
+        const phone = inv.contact?.phone;
         if (!email) continue;
         const urls = await buildRsvpUrls(responseEvent.id, email);
+        
+        // Send email invitation
         await sendInviteEmail(
           { email, name },
           {
@@ -1221,6 +1274,19 @@ app.post("/make-server-37f8437f/events", async (c) => {
             declineUrl: urls.declineUrl,
           },
         );
+        
+        // Send SMS invitation if phone number is available
+        if (phone) {
+          await sendInvitationSms(phone, {
+            eventId: responseEvent.id,
+            eventTitle: responseEvent.title,
+            eventDate: responseEvent.date,
+            eventTime: responseEvent.time,
+            location: responseEvent.location,
+            organizerName: responseEvent.organizer.name || 'Organizer',
+            inviteeName: name,
+          });
+        }
       };
     }
     
