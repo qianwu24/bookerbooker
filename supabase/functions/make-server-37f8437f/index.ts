@@ -796,7 +796,7 @@ app.post("/make-server-37f8437f/events", async (c) => {
     }
     
     // Fetch the complete event with invitees
-    const { data: fullEvent } = await supabase
+    const { data: fullEvent, error: fetchError } = await supabase
       .from('events')
       .select(`
         *,
@@ -805,15 +805,15 @@ app.post("/make-server-37f8437f/events", async (c) => {
           status,
           priority,
           invited_at,
-          contact:contacts!event_invitees_contact_id_fkey (id, email, name, phone)
+          contact:contacts (id, email, name, phone)
         )
       `)
       .eq('id', event.id)
       .single();
 
-    if (!fullEvent) {
-      console.log('Error fetching full event after creation');
-      return c.json({ error: 'Failed to fetch created event' }, 500);
+    if (fetchError || !fullEvent) {
+      console.log('Error fetching full event after creation:', fetchError);
+      return c.json({ error: 'Failed to fetch created event', details: fetchError?.message }, 500);
     }
     
     // Transform to match frontend expected format
