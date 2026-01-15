@@ -1212,7 +1212,7 @@ app.post("/make-server-37f8437f/events", async (c) => {
       const { data: insertedLinks, error: inviteesError } = await supabase
         .from('event_invitees')
         .upsert(inviteesData, { onConflict: 'event_id,contact_id', ignoreDuplicates: false })
-        .select(`*, contact:contacts(id, email, name)`);
+        .select(`*, contact:contacts(id, email, name, phone)`);
       
       if (inviteesError) {
         console.log('Error adding invitees:', inviteesError);
