@@ -130,6 +130,18 @@ export function CreateEvent({
     localStorage.setItem(locationKey, JSON.stringify(unique));
   }, []);
 
+  // Date/time validation helper - event must be at least 5 minutes in the future
+  const isDateTimeInFuture = (dateStr: string, timeStr: string): boolean => {
+    if (!dateStr || !timeStr) return false;
+    const candidate = new Date(`${dateStr}T${timeStr}`);
+    if (Number.isNaN(candidate.getTime())) return false;
+    // Require at least 5 minutes buffer
+    const fiveMinutesFromNow = Date.now() + 5 * 60 * 1000;
+    const result = candidate.getTime() > fiveMinutesFromNow;
+    console.log('🕐 isDateTimeInFuture check:', { dateStr, timeStr, candidate: candidate.toISOString(), now: new Date().toISOString(), fiveMinutesFromNow: new Date(fiveMinutesFromNow).toISOString(), result });
+    return result;
+  };
+
   // Clear time selection if it's no longer valid (e.g., user switched to today)
   useEffect(() => {
     if (time && timeOptions.length > 0) {
@@ -206,16 +218,6 @@ export function CreateEvent({
   // Get full E.164 phone number
   const getFullPhoneNumber = (digits: string, countryCode: string): string => {
     return `${countryCode}${digits.replace(/\D/g, '')}`;
-  };
-
-  // Date/time validation helper - event must be at least 5 minutes in the future
-  const isDateTimeInFuture = (dateStr: string, timeStr: string): boolean => {
-    if (!dateStr || !timeStr) return false;
-    const candidate = new Date(`${dateStr}T${timeStr}`);
-    if (Number.isNaN(candidate.getTime())) return false;
-    // Require at least 5 minutes buffer
-    const fiveMinutesFromNow = Date.now() + 5 * 60 * 1000;
-    return candidate.getTime() > fiveMinutesFromNow;
   };
 
   // Persist recent locations (max 5, unique)
@@ -362,6 +364,7 @@ export function CreateEvent({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('📋 Form submitted with date:', date, 'time:', time);
 
     // Validate inputs
     const validationErrors: { [key: string]: string } = {};
@@ -378,8 +381,13 @@ export function CreateEvent({
       validationErrors.time = 'Event time is required';
     }
 
-    if (date && time && !isDateTimeInFuture(date, time)) {
-      validationErrors.time = 'Event must be in the future (date/time)';
+    // Check if date/time is in the future
+    if (date && time) {
+      const isFuture = isDateTimeInFuture(date, time);
+      console.log('📋 Date/time future check result:', isFuture);
+      if (!isFuture) {
+        validationErrors.time = 'Event must be in the future (date/time)';
+      }
     }
     
     if (invitees.length === 0) {
@@ -810,15 +818,15 @@ export function CreateEvent({
                     onChange={(e) => setPhoneCountryCode(e.target.value)}
                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white text-gray-700 min-w-[80px]"
                   >
-                    <option value="+1">�🇦 +1</option>
-                    <option value="+1">🇺🇸 +1</option>
-                    <option value="+44">🇬🇧 +44</option>
-                    <option value="+86">🇨🇳 +86</option>
-                    <option value="+91">🇮🇳 +91</option>
-                    <option value="+81">🇯🇵 +81</option>
-                    <option value="+82">🇰🇷 +82</option>
-                    <option value="+61">🇦🇺 +61</option>
-                    <option value="+33">🇫🇷 +33</option>
+                    <option value="+1">CA +1</option>
+                    <option value="+1">US +1</option>
+                    <option value="+44">UK +44</option>
+                    <option value="+86">CN +86</option>
+                    <option value="+91">IN +91</option>
+                    <option value="+81">JP +81</option>
+                    <option value="+82">KR +82</option>
+                    <option value="+61">AU +61</option>
+                    <option value="+33">FR +33</option>
                     <option value="+49">🇩🇪 +49</option>
                   </select>
                   {/* Phone Number Input */}
