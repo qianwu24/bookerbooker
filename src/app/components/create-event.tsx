@@ -76,7 +76,37 @@ export function CreateEvent({
   };
 
   const dateOptions = generateDateOptions();
-  const timeOptions = generateTimeOptions();
+  const allTimeOptions = generateTimeOptions();
+
+  // Filter time options - only show future times if date is today
+  const getFilteredTimeOptions = () => {
+    if (!date) return allTimeOptions;
+    
+    const today = new Date();
+    const selectedDate = new Date(date + 'T00:00:00');
+    
+    // If selected date is in the future, show all times
+    if (selectedDate.toDateString() !== today.toDateString()) {
+      return allTimeOptions;
+    }
+    
+    // For today, only show times at least 15 minutes from now
+    const now = new Date();
+    const bufferMinutes = 15;
+    now.setMinutes(now.getMinutes() + bufferMinutes);
+    
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    return allTimeOptions.filter(opt => {
+      const [h, m] = opt.value.split(':').map(Number);
+      if (h > currentHour) return true;
+      if (h === currentHour && m >= currentMinute) return true;
+      return false;
+    });
+  };
+
+  const timeOptions = getFilteredTimeOptions();
 
   // Load cached locations on mount
   useEffect(() => {
@@ -100,6 +130,31 @@ export function CreateEvent({
     setLocationHistory(unique);
     localStorage.setItem(locationKey, JSON.stringify(unique));
   }, []);
+
+  // Clear time selection if it's no longer valid (e.g., user switched to today)
+  useEffect(() => {
+    if (time && timeOptions.length > 0) {
+      const isTimeStillValid = timeOptions.some(opt => opt.value === time);
+      if (!isTimeStillValid) {
+        setTime(''); // Clear invalid time
+      }
+    }
+  }, [date, timeOptions]);
+
+  // Real-time validation for date/time - check if event is in the future
+  useEffect(() => {
+    if (date && time) {
+      if (!isDateTimeInFuture(date, time)) {
+        setErrors(prev => ({ ...prev, time: 'Event must be in the future' }));
+      } else {
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors.time;
+          return newErrors;
+        });
+      }
+    }
+  }, [date, time]);
 
   // Email validation helper
   const isValidEmail = (email: string): boolean => {
@@ -154,12 +209,14 @@ export function CreateEvent({
     return `${countryCode}${digits.replace(/\D/g, '')}`;
   };
 
-  // Date/time validation helper
+  // Date/time validation helper - event must be at least 5 minutes in the future
   const isDateTimeInFuture = (dateStr: string, timeStr: string): boolean => {
     if (!dateStr || !timeStr) return false;
     const candidate = new Date(`${dateStr}T${timeStr}`);
     if (Number.isNaN(candidate.getTime())) return false;
-    return candidate.getTime() >= Date.now();
+    // Require at least 5 minutes buffer
+    const fiveMinutesFromNow = Date.now() + 5 * 60 * 1000;
+    return candidate.getTime() > fiveMinutesFromNow;
   };
 
   // Persist recent locations (max 5, unique)
