@@ -122,7 +122,7 @@ export function processRsvpAction(
 /**
  * Calculate event status badges based on invitees and event time.
  */
-export type ConfirmationStatus = 'scheduled' | 'invited' | 'no-show';
+export type ConfirmationStatus = 'scheduled' | 'invited' | 'declined' | 'no-show';
 export type TimeStatus = 'approaching' | 'upcoming' | 'completed';
 
 export function calculateEventStatuses(
@@ -135,19 +135,22 @@ export function calculateEventStatuses(
   const hasAccepted = invitees.some((inv) => inv.status === 'accepted');
   const hasInvited = invitees.some((inv) => inv.status === 'invited');
   const hasPending = invitees.some((inv) => inv.status === 'pending');
+  const allDeclined = invitees.length > 0 && invitees.every((inv) => inv.status === 'declined');
 
   // Confirmation status
   let confirmationStatus: ConfirmationStatus;
   if (hasAccepted) {
     confirmationStatus = 'scheduled';
+  } else if (allDeclined) {
+    confirmationStatus = 'declined';
   } else if (hasInvited || hasPending) {
     confirmationStatus = 'invited';
   } else {
     confirmationStatus = 'no-show';
   }
 
-  // For past events with no acceptance, mark as no-show
-  if (hasPassed && !hasAccepted) {
+  // For past events with no acceptance, mark as no-show (unless all declined)
+  if (hasPassed && !hasAccepted && !allDeclined) {
     confirmationStatus = 'no-show';
   }
 

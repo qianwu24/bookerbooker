@@ -2,7 +2,7 @@ export type InviteeStatus = 'pending' | 'invited' | 'accepted' | 'declined';
 
 export type InviteMode = 'priority' | 'first-come-first-serve';
 
-export type ConfirmationStatus = 'scheduled' | 'invited' | 'no-show';
+export type ConfirmationStatus = 'scheduled' | 'invited' | 'declined' | 'no-show';
 export type TimeStatus = 'approaching' | 'upcoming' | 'completed';
 
 // Legacy type for compatibility

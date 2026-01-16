@@ -10,6 +10,7 @@ export interface EventStatuses {
  * 
  * Confirmation Status:
  * - 'scheduled': At least one invitee has accepted
+ * - 'declined': All invitees have declined (event won't happen)
  * - 'invited': Future event with pending/invited invitees (or no invitees yet)
  * - 'no-show': Past event with no accepted invitees
  * 
@@ -26,11 +27,14 @@ export function calculateEventStatuses(event: Event, now: Date = new Date()): Ev
   const hasAccepted = event.invitees.some(inv => inv.status === 'accepted');
   const hasInvited = event.invitees.some(inv => inv.status === 'invited');
   const hasPending = event.invitees.some(inv => inv.status === 'pending');
+  const allDeclined = event.invitees.length > 0 && event.invitees.every(inv => inv.status === 'declined');
   
-  // Confirmation status: scheduled (accepted) > invited > no-show (only for past events)
+  // Confirmation status: scheduled (accepted) > declined (all declined) > invited > no-show (only for past events)
   let confirmationStatus: ConfirmationStatus;
   if (hasAccepted) {
     confirmationStatus = 'scheduled';
+  } else if (allDeclined) {
+    confirmationStatus = 'declined';
   } else if (hasPassed) {
     // Past event with no accepted invitees = no-show
     confirmationStatus = 'no-show';

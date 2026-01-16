@@ -89,6 +89,8 @@ export function EventCard({
         return 'border-green-300 bg-green-50/30';
       case 'invited':
         return 'border-purple-300 bg-purple-50/30';
+      case 'declined':
+        return 'border-red-300 bg-red-50/30';
       case 'no-show':
         return 'border-gray-300 bg-gray-50 opacity-75';
       default:
@@ -96,7 +98,7 @@ export function EventCard({
     }
   };
 
-  // Get confirmation status badge (Scheduled/Invited/No Show)
+  // Get confirmation status badge (Scheduled/Invited/Declined/No Show)
   const getConfirmationBadge = () => {
     if (isAcceptedByCurrentUser) {
       return (
@@ -119,6 +121,13 @@ export function EventCard({
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm font-medium">
             <Mail className="w-4 h-4" />
             <span>Invited</span>
+          </div>
+        );
+      case 'declined':
+        return (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium">
+            <XCircle className="w-4 h-4" />
+            <span>All Declined</span>
           </div>
         );
       case 'no-show':
