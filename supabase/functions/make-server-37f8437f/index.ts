@@ -1656,23 +1656,19 @@ app.delete("/make-server-37f8437f/events/:eventId", async (c) => {
         const message = `❌ "${event.title}" on ${formatDateForSms(event.date)} at ${formatTimeForSms(event.time)} has been cancelled by ${organizerName}.`;
         
         console.log(`📱 Sending cancellation SMS to ${phone}`);
-        
-        const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-        const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-        const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
 
-        if (twilioAccountSid && twilioAuthToken && twilioPhoneNumber) {
+        if (TWILIO_ACCOUNT_SID && TWILIO_API_KEY && TWILIO_API_SECRET && TWILIO_PHONE_NUMBER) {
           const twilioResponse = await fetch(
-            `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`,
+            `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
             {
               method: 'POST',
               headers: {
-                'Authorization': `Basic ${btoa(`${twilioAccountSid}:${twilioAuthToken}`)}`,
+                'Authorization': `Basic ${btoa(`${TWILIO_API_KEY}:${TWILIO_API_SECRET}`)}`,
                 'Content-Type': 'application/x-www-form-urlencoded',
               },
               body: new URLSearchParams({
                 To: phone,
-                From: twilioPhoneNumber,
+                From: TWILIO_PHONE_NUMBER,
                 Body: message,
               }),
             }
@@ -1684,6 +1680,8 @@ app.delete("/make-server-37f8437f/events/:eventId", async (c) => {
             const errorText = await twilioResponse.text();
             console.log(`⚠️ Failed to send cancellation SMS to ${phone}:`, errorText);
           }
+        } else {
+          console.log('⚠️ Twilio credentials not configured for cancellation SMS');
         }
       } catch (smsError) {
         console.log(`⚠️ Error sending cancellation SMS:`, smsError);
