@@ -1600,10 +1600,16 @@ app.delete("/make-server-37f8437f/events/:eventId", async (c) => {
     const eventId = c.req.param('eventId');
     const supabase = getServiceClient();
     
-    // Verify user is the organizer
+    // Fetch full event details including invitees for notification
     const { data: event } = await supabase
       .from('events')
-      .select('organizer_id')
+      .select(`
+        id, organizer_id, title, date, time, location,
+        invitees:event_invitees(
+          id, status,
+          contact:contacts(phone, name)
+        )
+      `)
       .eq('id', eventId)
       .single();
     
@@ -1613,6 +1619,76 @@ app.delete("/make-server-37f8437f/events/:eventId", async (c) => {
     
     if (event.organizer_id !== user.id) {
       return c.json({ error: 'Unauthorized - not the organizer' }, 403);
+    }
+
+    // Get organizer name
+    const { data: organizer } = await supabase
+      .from('profiles')
+      .select('name')
+      .eq('id', user.id)
+      .single();
+    const organizerName = organizer?.name || user.email?.split('@')[0] || 'The organizer';
+
+    // Format date and time for SMS
+    const formatDateForSms = (dateStr: string): string => {
+      const date = new Date(dateStr + 'T00:00:00');
+      return date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+    };
+    
+    const formatTimeForSms = (timeStr: string): string => {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const hour12 = hours % 12 || 12;
+      return `${hour12}:${minutes.toString().padStart(2, '0')} ${period}`;
+    };
+
+    // Send cancellation SMS to all invitees with phone numbers
+    const inviteesWithPhone = (event.invitees || []).filter((inv: any) => inv.contact?.phone);
+    console.log(`📤 Sending cancellation SMS to ${inviteesWithPhone.length} invitees for event "${event.title}"`);
+
+    for (const inv of inviteesWithPhone) {
+      try {
+        const phone = inv.contact.phone;
+        const message = `❌ "${event.title}" on ${formatDateForSms(event.date)} at ${formatTimeForSms(event.time)} has been cancelled by ${organizerName}.`;
+        
+        console.log(`📱 Sending cancellation SMS to ${phone}`);
+        
+        const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+        const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+        const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
+
+        if (twilioAccountSid && twilioAuthToken && twilioPhoneNumber) {
+          const twilioResponse = await fetch(
+            `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Basic ${btoa(`${twilioAccountSid}:${twilioAuthToken}`)}`,
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                To: phone,
+                From: twilioPhoneNumber,
+                Body: message,
+              }),
+            }
+          );
+
+          if (twilioResponse.ok) {
+            console.log(`✅ Cancellation SMS sent to ${phone}`);
+          } else {
+            const errorText = await twilioResponse.text();
+            console.log(`⚠️ Failed to send cancellation SMS to ${phone}:`, errorText);
+          }
+        }
+      } catch (smsError) {
+        console.log(`⚠️ Error sending cancellation SMS:`, smsError);
+        // Continue with other invitees even if one fails
+      }
     }
     
     // Delete the event (invitees will cascade delete)
@@ -1626,7 +1702,8 @@ app.delete("/make-server-37f8437f/events/:eventId", async (c) => {
       return c.json({ error: deleteError.message }, 400);
     }
     
-    return c.json({ success: true });
+    console.log(`✅ Event "${event.title}" deleted, ${inviteesWithPhone.length} invitees notified`);
+    return c.json({ success: true, notifiedCount: inviteesWithPhone.length });
   } catch (error) {
     console.log('Error deleting event:', error);
     return c.json({ error: 'Internal server error' }, 500);

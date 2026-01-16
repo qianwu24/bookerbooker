@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Calendar, Clock, MapPin, Plus, X, ArrowUp, ArrowDown, Users, Zap, UserPlus, AlertCircle, ChevronDown, Phone, Loader2 } from 'lucide-react';
 import type { Event, Invitee, InviteMode, Contact } from '../types';
 
@@ -78,14 +78,15 @@ export function CreateEvent({
   const dateOptions = generateDateOptions();
   const allTimeOptions = generateTimeOptions();
 
-  // Filter time options - only show future times if date is today
-  const getFilteredTimeOptions = () => {
+  // Filter time options - only filter past times if date is selected and is today
+  const timeOptions = useMemo(() => {
+    // If no date selected, show all times (validation will catch past time on submit)
     if (!date) return allTimeOptions;
     
     const today = new Date();
     const selectedDate = new Date(date + 'T00:00:00');
     
-    // If selected date is in the future, show all times
+    // If selected date is in the future (not today), show all times
     if (selectedDate.toDateString() !== today.toDateString()) {
       return allTimeOptions;
     }
@@ -104,9 +105,7 @@ export function CreateEvent({
       if (h === currentHour && m >= currentMinute) return true;
       return false;
     });
-  };
-
-  const timeOptions = getFilteredTimeOptions();
+  }, [date, allTimeOptions]);
 
   // Load cached locations on mount
   useEffect(() => {
@@ -811,8 +810,8 @@ export function CreateEvent({
                     onChange={(e) => setPhoneCountryCode(e.target.value)}
                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white text-gray-700 min-w-[80px]"
                   >
+                    <option value="+1">�🇦 +1</option>
                     <option value="+1">🇺🇸 +1</option>
-                    <option value="+1">🇨🇦 +1</option>
                     <option value="+44">🇬🇧 +44</option>
                     <option value="+86">🇨🇳 +86</option>
                     <option value="+91">🇮🇳 +91</option>

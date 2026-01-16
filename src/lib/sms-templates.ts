@@ -64,6 +64,13 @@ export function getOrganizerReminderSms(data: EventSmsData): string {
 }
 
 /**
+ * 4. CANCELLATION SMS - Sent to invitees when organizer cancels the event
+ */
+export function getCancellationSms(data: EventSmsData): string {
+  return `❌ "${data.eventTitle}" on ${data.eventDate} at ${data.eventTime} has been cancelled by ${data.organizerName}.`;
+}
+
+/**
  * Helper: Format date for SMS (compact format)
  */
 export function formatDateForSms(dateStr: string): string {

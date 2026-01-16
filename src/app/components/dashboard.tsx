@@ -1293,8 +1293,8 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                   onChange={(e) => setUserPhoneCountryCode(e.target.value)}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white text-gray-700 min-w-[80px]"
                 >
+                  <option value="+1">�🇦 +1</option>
                   <option value="+1">🇺🇸 +1</option>
-                  <option value="+1">🇨🇦 +1</option>
                   <option value="+44">🇬🇧 +44</option>
                   <option value="+86">🇨🇳 +86</option>
                   <option value="+91">🇮🇳 +91</option>
