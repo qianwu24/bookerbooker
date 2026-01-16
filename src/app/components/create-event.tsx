@@ -152,43 +152,44 @@ export function CreateEvent({
 
   // Add invitee from contact
   const handleAddFromContact = (contact: Contact) => {
-    // Prevent adding yourself as an invitee
-    if (contact.email?.toLowerCase() === currentUser.email.toLowerCase()) {
-      setDuplicateAlert("You can't invite yourself");
+    // For SMS-only MVP, contact must have a phone number
+    if (!contact.phone) {
+      setDuplicateAlert("This contact doesn't have a phone number");
       setTimeout(() => setDuplicateAlert(null), 3000);
       return;
     }
     
-    // Check for duplicate email
-    if (invitees.some(inv => inv.email?.toLowerCase() === contact.email?.toLowerCase())) {
-      setDuplicateAlert(contact.email || 'This contact');
-      // Auto-dismiss after 3 seconds
+    // Normalize the phone for comparison
+    const normalizedContactPhone = normalizePhone(contact.phone);
+    
+    // Check for duplicate phone
+    if (invitees.some(inv => inv.phone === normalizedContactPhone)) {
+      setDuplicateAlert(contact.name || 'This contact');
       setTimeout(() => setDuplicateAlert(null), 3000);
       return;
     }
 
-    // Validate phone format if present - warn but still add
-    let validPhone = contact.phone;
-    if (contact.phone && !isValidPhone(contact.phone)) {
-      console.warn(`Contact ${contact.name} has invalid phone format: ${contact.phone}. SMS will not be sent.`);
-      validPhone = undefined; // Don't use invalid phone
+    // Validate phone format
+    if (!isValidPhone(contact.phone)) {
+      setDuplicateAlert(`Invalid phone format for ${contact.name}`);
+      setTimeout(() => setDuplicateAlert(null), 3000);
+      return;
     }
 
     const newInvitee: Invitee = {
-      email: contact.email,
       name: contact.name,
-      phone: validPhone,
+      phone: normalizedContactPhone,
       priority: invitees.length,
       status: inviteMode === 'first-come-first-serve' ? 'invited' : (invitees.length === 0 ? 'invited' : 'pending'),
     };
     setInvitees([...invitees, newInvitee]);
   };
 
-  // Get available contacts (not already added as invitees and not the current user)
+  // Get available contacts (must have phone, not already added)
   const availableContacts = contacts.filter(
     contact => 
-      contact.email?.toLowerCase() !== currentUser.email.toLowerCase() &&
-      !invitees.some(inv => inv.email?.toLowerCase() === contact.email?.toLowerCase())
+      contact.phone && // Must have phone for SMS-only MVP
+      !invitees.some(inv => inv.phone === normalizePhone(contact.phone || ''))
   );
 
   const handleAddInvitee = () => {
@@ -204,50 +205,33 @@ export function CreateEvent({
       return;
     }
     
-    // Validate that at least email or phone is provided
-    const hasEmail = newInviteeEmail && newInviteeEmail.trim().length > 0;
+    // Validate phone number is provided (SMS-only for MVP)
     const hasPhone = newInviteePhone && newInviteePhone.trim().length > 0;
     
-    if (!hasEmail && !hasPhone) {
-      setErrors({ ...newErrors, inviteeEmail: 'Either email or phone is required' });
+    if (!hasPhone) {
+      setErrors({ ...newErrors, inviteePhone: 'Phone number is required' });
       return;
     }
     
-    // Validate email format if provided
-    if (hasEmail && !isValidEmail(newInviteeEmail.trim())) {
-      setErrors({ ...newErrors, inviteeEmail: 'Please enter a valid email address' });
-      return;
-    }
-    
-    // Normalize and validate phone format if provided
-    const normalizedPhone = hasPhone ? normalizePhone(newInviteePhone.trim()) : undefined;
-    if (hasPhone && !isValidPhone(newInviteePhone.trim())) {
+    // Normalize and validate phone format
+    const normalizedPhone = normalizePhone(newInviteePhone.trim());
+    if (!isValidPhone(newInviteePhone.trim())) {
       setErrors({ ...newErrors, inviteePhone: 'Invalid phone number. Enter 10 digits (e.g., 6478850820) or full E.164 format (+16478850820)' });
       return;
     }
     
-    // Prevent adding yourself as an invitee
-    if (hasEmail && newInviteeEmail.trim().toLowerCase() === currentUser.email.toLowerCase()) {
-      setErrors({ ...newErrors, inviteeEmail: "You can't invite yourself" });
-      return;
-    }
-    
-    // Check for duplicate (by email or normalized phone)
-    const emailToCheck = hasEmail ? newInviteeEmail.trim().toLowerCase() : null;
-    
+    // Check for duplicate (by normalized phone)
     const isDuplicate = invitees.some(inv => {
-      if (emailToCheck && inv.email?.toLowerCase() === emailToCheck) return true;
       if (normalizedPhone && inv.phone === normalizedPhone) return true;
       return false;
     });
     
     if (isDuplicate) {
-      setErrors({ ...newErrors, inviteeEmail: 'This contact has already been added' });
+      setErrors({ ...newErrors, inviteePhone: 'This contact has already been added' });
       return;
     }
 
     const newInvitee: Invitee = {
-      email: hasEmail ? newInviteeEmail.trim() : undefined,
       name: newInviteeName.trim(),
       phone: normalizedPhone,
       priority: invitees.length,
@@ -255,7 +239,6 @@ export function CreateEvent({
       status: inviteMode === 'first-come-first-serve' ? 'invited' : (invitees.length === 0 ? 'invited' : 'pending'),
     };
     setInvitees([...invitees, newInvitee]);
-    setNewInviteeEmail('');
     setNewInviteeName('');
     setNewInviteePhone('');
     setErrors(newErrors); // Clear invitee errors
@@ -738,22 +721,6 @@ export function CreateEvent({
                   }}
                 />
                 {errors.inviteeName && <p className="text-red-500 text-sm mt-1">{errors.inviteeName}</p>}
-              </div>
-              <div className="flex-1">
-                <input
-                  type="email"
-                  value={newInviteeEmail}
-                  onChange={(e) => setNewInviteeEmail(e.target.value)}
-                  placeholder="email@example.com"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddInvitee();
-                    }
-                  }}
-                />
-                {errors.inviteeEmail && <p className="text-red-500 text-sm mt-1">{errors.inviteeEmail}</p>}
               </div>
               <div className="flex-1">
                 <div className="relative">
