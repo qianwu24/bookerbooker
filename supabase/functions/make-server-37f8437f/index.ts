@@ -1714,15 +1714,31 @@ app.post("/make-server-37f8437f/sms/webhook", async (c) => {
       });
     });
 
+    // Helper to normalize phone to just digits (strip + and country code variations)
+    const normalizePhoneForComparison = (phone: string | null | undefined): string => {
+      if (!phone) return '';
+      // Remove all non-digit characters
+      const digitsOnly = phone.replace(/\D/g, '');
+      // If starts with 1 and has 11 digits (US/Canada), strip the leading 1
+      if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+        return digitsOnly.substring(1);
+      }
+      return digitsOnly;
+    };
+
+    const normalizedIncoming = normalizePhoneForComparison(normalizedPhone);
+    console.log('📱 [SMS WEBHOOK] Normalized for comparison:', normalizedIncoming);
+
     // Find invitation matching the phone number
     const matchingInvite = pendingInvites?.find((inv: any) => {
-      const contactPhone = inv.contact?.phone?.replace(/[^\d+]/g, '');
-      console.log('📱 [SMS WEBHOOK] Comparing:', { contactPhone, normalizedPhone, match: contactPhone === normalizedPhone });
-      return contactPhone === normalizedPhone;
+      const contactPhoneNormalized = normalizePhoneForComparison(inv.contact?.phone);
+      const isMatch = contactPhoneNormalized === normalizedIncoming && contactPhoneNormalized.length > 0;
+      console.log('📱 [SMS WEBHOOK] Comparing:', { contactPhoneNormalized, normalizedIncoming, match: isMatch });
+      return isMatch;
     });
 
     if (!matchingInvite) {
-      console.log('📱 [SMS WEBHOOK] No matching invite found for phone:', normalizedPhone);
+      console.log('📱 [SMS WEBHOOK] No matching invite found for phone:', normalizedIncoming);
       return c.text('<?xml version="1.0" encoding="UTF-8"?><Response><Message>You don\'t have any pending event invitations to respond to.</Message></Response>', 200, {
         'Content-Type': 'text/xml',
       });
