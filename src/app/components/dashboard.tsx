@@ -43,9 +43,27 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
   const [hasMoreEvents, setHasMoreEvents] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [userPhone, setUserPhone] = useState<string>('');
+  const [userPhoneCountryCode, setUserPhoneCountryCode] = useState<string>('+1');
   const [savingPhone, setSavingPhone] = useState(false);
   const [phoneSaveMessage, setPhoneSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const EVENTS_PER_PAGE = 10;
+
+  // Format phone number for display: (XXX) XXX-XXXX
+  const formatPhoneDisplay = (phone: string): string => {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 0) return '';
+    if (digits.length <= 3) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+  };
+
+  // Handle phone input change with formatting
+  const handleUserPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value;
+    // Extract only digits, max 10
+    const digits = input.replace(/\D/g, '').slice(0, 10);
+    setUserPhone(digits);
+  };
 
   // Helper function to get fresh access token
   const getFreshToken = async () => {
@@ -175,7 +193,24 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
         .single();
       
       if (!error && data?.phone) {
-        setUserPhone(data.phone);
+        // Parse E.164 format to extract country code and local number
+        const phone = data.phone as string;
+        if (phone.startsWith('+1') && phone.length === 12) {
+          setUserPhoneCountryCode('+1');
+          setUserPhone(phone.slice(2)); // Remove +1
+        } else if (phone.startsWith('+')) {
+          // Try to match other country codes
+          const countryCodeMatch = phone.match(/^(\+\d{1,3})/);
+          if (countryCodeMatch) {
+            const code = countryCodeMatch[1];
+            setUserPhoneCountryCode(code);
+            setUserPhone(phone.slice(code.length));
+          } else {
+            setUserPhone(phone.replace(/\D/g, ''));
+          }
+        } else {
+          setUserPhone(phone.replace(/\D/g, ''));
+        }
       }
     } catch (error) {
       console.error('Error fetching user phone:', error);
@@ -187,16 +222,20 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
     setPhoneSaveMessage(null);
     
     try {
-      // Basic phone validation - allow empty or valid format
+      // Basic phone validation - allow empty or valid 10-digit format
       const cleanPhone = userPhone.replace(/\D/g, '');
-      if (userPhone && cleanPhone.length < 10) {
-        setPhoneSaveMessage({ type: 'error', text: 'Please enter a valid phone number' });
+      if (userPhone && cleanPhone.length !== 10) {
+        setPhoneSaveMessage({ type: 'error', text: 'Please enter a valid 10-digit phone number' });
+        setSavingPhone(false);
         return;
       }
 
+      // Build full E.164 phone number
+      const fullPhone = cleanPhone ? `${userPhoneCountryCode}${cleanPhone}` : null;
+
       const { error } = await supabase
         .from('users')
-        .update({ phone: userPhone || null })
+        .update({ phone: fullPhone })
         .eq('id', user.id);
       
       if (error) {
@@ -1245,11 +1284,26 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                 Add your phone number to receive SMS notifications as an event organizer.
               </p>
               <div className="flex gap-2">
+                <select
+                  value={userPhoneCountryCode}
+                  onChange={(e) => setUserPhoneCountryCode(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white text-gray-700 min-w-[80px]"
+                >
+                  <option value="+1">🇺🇸 +1</option>
+                  <option value="+44">🇬🇧 +44</option>
+                  <option value="+86">🇨🇳 +86</option>
+                  <option value="+91">🇮🇳 +91</option>
+                  <option value="+81">🇯🇵 +81</option>
+                  <option value="+82">🇰🇷 +82</option>
+                  <option value="+61">🇦🇺 +61</option>
+                  <option value="+33">🇫🇷 +33</option>
+                  <option value="+49">🇩🇪 +49</option>
+                </select>
                 <input
                   type="tel"
-                  value={userPhone}
-                  onChange={(e) => setUserPhone(e.target.value)}
-                  placeholder="+1 (555) 123-4567"
+                  value={formatPhoneDisplay(userPhone)}
+                  onChange={handleUserPhoneChange}
+                  placeholder="(555) 123-4567"
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                 />
                 <button

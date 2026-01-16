@@ -30,6 +30,7 @@ export function CreateEvent({
   const [newInviteeEmail, setNewInviteeEmail] = useState('');
   const [newInviteeName, setNewInviteeName] = useState('');
   const [newInviteePhone, setNewInviteePhone] = useState('');
+  const [phoneCountryCode, setPhoneCountryCode] = useState('+1');
   const [inviteMode, setInviteMode] = useState<InviteMode>('first-come-first-serve');
   const [autoPromoteInterval, setAutoPromoteInterval] = useState<number>(30); // Default 30 minutes
   const [durationMinutes, setDurationMinutes] = useState<number>(60);
@@ -124,12 +125,32 @@ export function CreateEvent({
     return phone;
   };
 
-  // Phone validation helper (E.164 format: +1XXXXXXXXXX)
+  // Format phone number for display: (XXX) XXX-XXXX
+  const formatPhoneDisplay = (phone: string): string => {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 0) return '';
+    if (digits.length <= 3) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+  };
+
+  // Handle phone input change with formatting
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value;
+    // Extract only digits, max 10
+    const digits = input.replace(/\D/g, '').slice(0, 10);
+    setNewInviteePhone(digits);
+  };
+
+  // Phone validation helper - check if 10 digits
   const isValidPhone = (phone: string): boolean => {
-    const normalized = normalizePhone(phone);
-    // E.164 format: + followed by 1-15 digits
-    const phoneRegex = /^\+[1-9]\d{1,14}$/;
-    return phoneRegex.test(normalized);
+    const digits = phone.replace(/\D/g, '');
+    return digits.length === 10;
+  };
+
+  // Get full E.164 phone number
+  const getFullPhoneNumber = (digits: string, countryCode: string): string => {
+    return `${countryCode}${digits.replace(/\D/g, '')}`;
   };
 
   // Date/time validation helper
@@ -206,23 +227,25 @@ export function CreateEvent({
     }
     
     // Validate phone number is provided (SMS-only for MVP)
-    const hasPhone = newInviteePhone && newInviteePhone.trim().length > 0;
+    const phoneDigits = newInviteePhone.replace(/\D/g, '');
     
-    if (!hasPhone) {
+    if (phoneDigits.length === 0) {
       setErrors({ ...newErrors, inviteePhone: 'Phone number is required' });
       return;
     }
     
-    // Normalize and validate phone format
-    const normalizedPhone = normalizePhone(newInviteePhone.trim());
-    if (!isValidPhone(newInviteePhone.trim())) {
-      setErrors({ ...newErrors, inviteePhone: 'Invalid phone number. Enter 10 digits (e.g., 6478850820) or full E.164 format (+16478850820)' });
+    // Validate phone format (must be 10 digits)
+    if (!isValidPhone(newInviteePhone)) {
+      setErrors({ ...newErrors, inviteePhone: 'Please enter a valid 10-digit phone number' });
       return;
     }
     
+    // Get full E.164 phone number
+    const fullPhone = getFullPhoneNumber(phoneDigits, phoneCountryCode);
+    
     // Check for duplicate (by normalized phone)
     const isDuplicate = invitees.some(inv => {
-      if (normalizedPhone && inv.phone === normalizedPhone) return true;
+      if (fullPhone && inv.phone === fullPhone) return true;
       return false;
     });
     
@@ -233,7 +256,7 @@ export function CreateEvent({
 
     const newInvitee: Invitee = {
       name: newInviteeName.trim(),
-      phone: normalizedPhone,
+      phone: fullPhone,
       priority: invitees.length,
       // In first-come-first-serve mode, everyone is invited immediately
       status: inviteMode === 'first-come-first-serve' ? 'invited' : (invitees.length === 0 ? 'invited' : 'pending'),
@@ -723,21 +746,39 @@ export function CreateEvent({
                 {errors.inviteeName && <p className="text-red-500 text-sm mt-1">{errors.inviteeName}</p>}
               </div>
               <div className="flex-1">
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="tel"
-                    value={newInviteePhone}
-                    onChange={(e) => setNewInviteePhone(e.target.value)}
-                    placeholder="6478850820"
-                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none ${errors.inviteePhone ? 'border-red-500' : 'border-gray-300'}`}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddInvitee();
-                      }
-                    }}
-                  />
+                <div className="flex gap-2">
+                  {/* Country Code Dropdown */}
+                  <select
+                    value={phoneCountryCode}
+                    onChange={(e) => setPhoneCountryCode(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white text-gray-700 min-w-[80px]"
+                  >
+                    <option value="+1">🇺🇸 +1</option>
+                    <option value="+44">🇬🇧 +44</option>
+                    <option value="+86">🇨🇳 +86</option>
+                    <option value="+91">🇮🇳 +91</option>
+                    <option value="+81">🇯🇵 +81</option>
+                    <option value="+82">🇰🇷 +82</option>
+                    <option value="+61">🇦🇺 +61</option>
+                    <option value="+33">🇫🇷 +33</option>
+                    <option value="+49">🇩🇪 +49</option>
+                  </select>
+                  {/* Phone Number Input */}
+                  <div className="relative flex-1">
+                    <input
+                      type="tel"
+                      value={formatPhoneDisplay(newInviteePhone)}
+                      onChange={handlePhoneChange}
+                      placeholder="(647) 885-0820"
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none ${errors.inviteePhone ? 'border-red-500' : 'border-gray-300'}`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddInvitee();
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
                 {errors.inviteePhone && <p className="text-red-500 text-sm mt-1">{errors.inviteePhone}</p>}
               </div>
