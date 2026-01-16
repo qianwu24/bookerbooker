@@ -268,10 +268,14 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
         return;
       }
 
-      // Fetch invite counts separately
+      // Get the contact IDs for this user
+      const contactIds = (contactsData || []).map((c: any) => c.id);
+
+      // Fetch invite counts separately - only for this user's contacts
       const { data: invitesData, error: invitesError } = await supabase
         .from('event_invitees')
-        .select('contact_id, invited_at');
+        .select('contact_id, invited_at')
+        .in('contact_id', contactIds.length > 0 ? contactIds : ['00000000-0000-0000-0000-000000000000']);
 
       if (invitesError) {
         console.error('Error fetching invites:', invitesError.message);
@@ -1290,6 +1294,7 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white text-gray-700 min-w-[80px]"
                 >
                   <option value="+1">🇺🇸 +1</option>
+                  <option value="+1">🇨🇦 +1</option>
                   <option value="+44">🇬🇧 +44</option>
                   <option value="+86">🇨🇳 +86</option>
                   <option value="+91">🇮🇳 +91</option>

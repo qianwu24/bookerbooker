@@ -142,10 +142,11 @@ export function CreateEvent({
     setNewInviteePhone(digits);
   };
 
-  // Phone validation helper - check if 10 digits
+  // Phone validation helper - check if valid phone (10 or 11 digits with country code)
   const isValidPhone = (phone: string): boolean => {
     const digits = phone.replace(/\D/g, '');
-    return digits.length === 10;
+    // Accept 10 digits (local) or 11 digits (with country code like 1 for US/CA)
+    return digits.length === 10 || digits.length === 11;
   };
 
   // Get full E.164 phone number
@@ -185,7 +186,7 @@ export function CreateEvent({
     
     // Check for duplicate phone
     if (invitees.some(inv => inv.phone === normalizedContactPhone)) {
-      setDuplicateAlert(contact.name || 'This contact');
+      setDuplicateAlert(`${contact.name || 'This contact'} is already added.`);
       setTimeout(() => setDuplicateAlert(null), 3000);
       return;
     }
@@ -754,6 +755,7 @@ export function CreateEvent({
                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white text-gray-700 min-w-[80px]"
                   >
                     <option value="+1">🇺🇸 +1</option>
+                    <option value="+1">🇨🇦 +1</option>
                     <option value="+44">🇬🇧 +44</option>
                     <option value="+86">🇨🇳 +86</option>
                     <option value="+91">🇮🇳 +91</option>
@@ -769,7 +771,7 @@ export function CreateEvent({
                       type="tel"
                       value={formatPhoneDisplay(newInviteePhone)}
                       onChange={handlePhoneChange}
-                      placeholder="(647) 885-0820"
+                      placeholder="(555) 123-4567"
                       className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none ${errors.inviteePhone ? 'border-red-500' : 'border-gray-300'}`}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -814,7 +816,7 @@ export function CreateEvent({
                   <div className="mt-3 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-inner">
                     {availableContacts.map(contact => (
                       <button
-                        key={contact.email}
+                        key={contact.id || contact.email || contact.phone}
                         type="button"
                         onClick={() => handleAddFromContact(contact)}
                         className="w-full px-4 py-3 text-left hover:bg-indigo-50 transition-colors border-b border-gray-100 last:border-b-0 flex items-center gap-3 group"
@@ -828,7 +830,9 @@ export function CreateEvent({
                           <p className="text-sm font-medium text-gray-900 group-hover:text-indigo-600">
                             {contact.name}
                           </p>
-                          <p className="text-xs text-gray-500 truncate">{contact.email}</p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {contact.phone ? formatPhoneDisplay(contact.phone.replace(/^\+1/, '')) : 'No phone'}
+                          </p>
                         </div>
                         <Plus className="w-5 h-5 text-gray-400 group-hover:text-indigo-600" />
                       </button>
@@ -922,7 +926,7 @@ export function CreateEvent({
             {errors.invitees && <p className="text-red-500 text-sm mt-1">{errors.invitees}</p>}
             {duplicateAlert && (
               <p className="text-red-500 text-sm mt-1">
-                Email {duplicateAlert} is already added.
+                {duplicateAlert}
               </p>
             )}
           </div>
