@@ -1290,30 +1290,35 @@ app.post("/make-server-37f8437f/events", async (c) => {
           hasPhone: !!phone,
         });
         
-        if (!email) {
-          console.log('⚠️ [EVENT CREATE] Skipping invitee - no email');
+        // Skip if no contact method at all
+        if (!email && !phone) {
+          console.log('⚠️ [EVENT CREATE] Skipping invitee - no email or phone');
           continue;
         }
-        const urls = await buildRsvpUrls(responseEvent.id, email);
         
-        // Send email invitation
-        console.log('📧 [EVENT CREATE] Sending email to:', email);
-        await sendInviteEmail(
-          { email, name },
-          {
-            title: responseEvent.title,
-            date: responseEvent.date,
-            time: responseEvent.time,
-            location: responseEvent.location,
-            timeZone: responseEvent.timeZone,
-            durationMinutes: responseEvent.durationMinutes,
-            organizerName: responseEvent.organizer.name,
-            notes: responseEvent.description || '—',
-            orgName: responseEvent.organizer.name || 'Booker',
-            confirmUrl: urls.confirmUrl,
-            declineUrl: urls.declineUrl,
-          },
-        );
+        // Send email invitation if email is available
+        if (email) {
+          const urls = await buildRsvpUrls(responseEvent.id, email);
+          console.log('📧 [EVENT CREATE] Sending email to:', email);
+          await sendInviteEmail(
+            { email, name },
+            {
+              title: responseEvent.title,
+              date: responseEvent.date,
+              time: responseEvent.time,
+              location: responseEvent.location,
+              timeZone: responseEvent.timeZone,
+              durationMinutes: responseEvent.durationMinutes,
+              organizerName: responseEvent.organizer.name,
+              notes: responseEvent.description || '—',
+              orgName: responseEvent.organizer.name || 'Booker',
+              confirmUrl: urls.confirmUrl,
+              declineUrl: urls.declineUrl,
+            },
+          );
+        } else {
+          console.log('📧 [EVENT CREATE] No email for invitee, skipping email');
+        }
         
         // Send SMS invitation if phone number is available
         if (phone) {
