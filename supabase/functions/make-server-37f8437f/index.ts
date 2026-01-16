@@ -501,12 +501,18 @@ const sendSms = async (payload: SmsPayload): Promise<boolean> => {
 
 // SMS Template helpers
 const formatDateForSms = (dateStr: string): string => {
-  const date = new Date(dateStr + 'T00:00:00');
-  return date.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
+  // Parse date string directly to avoid timezone issues
+  // dateStr is in YYYY-MM-DD format
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  // Create date at noon to avoid any timezone edge cases
+  const date = new Date(year, month - 1, day, 12, 0, 0);
+  const weekday = weekdays[date.getDay()];
+  const monthName = months[month - 1];
+  
+  return `${weekday}, ${monthName} ${day}`;
 };
 
 const formatTimeForSms = (timeStr: string): string => {
@@ -1639,22 +1645,8 @@ app.delete("/make-server-37f8437f/events/:eventId", async (c) => {
     
     console.log(`📛 Organizer name for cancellation: "${organizerName}" (profile: ${profile?.name}, metadata: ${JSON.stringify(user.user_metadata)})`);
 
-    // Format date and time for SMS
-    const formatDateForSms = (dateStr: string): string => {
-      const date = new Date(dateStr + 'T00:00:00');
-      return date.toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      });
-    };
-    
-    const formatTimeForSms = (timeStr: string): string => {
-      const [hours, minutes] = timeStr.split(':').map(Number);
-      const period = hours >= 12 ? 'PM' : 'AM';
-      const hour12 = hours % 12 || 12;
-      return `${hour12}:${minutes.toString().padStart(2, '0')} ${period}`;
-    };
+    // Format date and time for SMS (use the global functions defined at the top)
+    // No need to redefine - using the global formatDateForSms and formatTimeForSms
 
     // Send cancellation SMS to all invitees with phone numbers
     const inviteesWithPhone = (event.invitees || []).filter((inv: any) => inv.contact?.phone);
