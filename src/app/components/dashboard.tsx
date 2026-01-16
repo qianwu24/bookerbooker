@@ -493,9 +493,10 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
   const getNoShowEvents = () => {
     const now = new Date();
     return events.filter((event) => {
-      const eventDate = new Date(event.date);
-      // Event is in the past
-      if (eventDate >= now) return false;
+      // Combine date and time for accurate comparison
+      const eventDateTime = new Date(`${event.date}T${event.time || '23:59'}`);
+      // Event is in the past (must be fully past, not just date)
+      if (eventDateTime >= now) return false;
       // No accepted invitees
       const hasAccepted = event.invitees?.some(
         (inv) => inv.status === 'accepted'
