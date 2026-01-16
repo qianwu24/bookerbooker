@@ -1657,9 +1657,11 @@ app.post("/make-server-37f8437f/sms/webhook", async (c) => {
 
     // Normalize phone number (remove any spaces/dashes)
     const normalizedPhone = from.replace(/[^\d+]/g, '');
+    console.log('📱 [SMS WEBHOOK] Normalized phone:', normalizedPhone);
 
     // Find the contact with this phone number who has a pending invitation
     // We look for the most recent pending/invited invitation for this phone
+    console.log('📱 [SMS WEBHOOK] Querying for pending invites...');
     const { data: pendingInvites, error: inviteError } = await supabase
       .from('event_invitees')
       .select(`
