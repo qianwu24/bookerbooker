@@ -1691,6 +1691,9 @@ app.post("/make-server-37f8437f/sms/webhook", async (c) => {
       .or(`status.eq.invited,status.eq.pending`)
       .order('invited_at', { ascending: false });
 
+    console.log('📱 [SMS WEBHOOK] Looking for invites with phone:', normalizedPhone);
+    console.log('📱 [SMS WEBHOOK] Found', pendingInvites?.length || 0, 'pending invites total');
+    
     if (inviteError) {
       console.log('Error finding pending invites:', inviteError);
       return c.text('<?xml version="1.0" encoding="UTF-8"?><Response><Message>Error processing your request. Please try again.</Message></Response>', 200, {
@@ -1698,17 +1701,32 @@ app.post("/make-server-37f8437f/sms/webhook", async (c) => {
       });
     }
 
+    // Log all pending invites for debugging
+    pendingInvites?.forEach((inv: any, idx: number) => {
+      console.log(`📱 [SMS WEBHOOK] Invite ${idx}:`, {
+        inviteId: inv.id,
+        status: inv.status,
+        contactPhone: inv.contact?.phone,
+        contactEmail: inv.contact?.email,
+        eventTitle: inv.event?.title,
+      });
+    });
+
     // Find invitation matching the phone number
     const matchingInvite = pendingInvites?.find((inv: any) => {
       const contactPhone = inv.contact?.phone?.replace(/[^\d+]/g, '');
+      console.log('📱 [SMS WEBHOOK] Comparing:', { contactPhone, normalizedPhone, match: contactPhone === normalizedPhone });
       return contactPhone === normalizedPhone;
     });
 
     if (!matchingInvite) {
+      console.log('📱 [SMS WEBHOOK] No matching invite found for phone:', normalizedPhone);
       return c.text('<?xml version="1.0" encoding="UTF-8"?><Response><Message>You don\'t have any pending event invitations to respond to.</Message></Response>', 200, {
         'Content-Type': 'text/xml',
       });
     }
+
+    console.log('📱 [SMS WEBHOOK] Found matching invite:', matchingInvite.id, 'for event:', matchingInvite.event?.title);
 
     // Parse the reply (Y/N)
     const newStatus = parseReplyStatus(body);
