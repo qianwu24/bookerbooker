@@ -81,13 +81,17 @@ export function CreateEvent({
   // Filter time options - only filter past times if date is selected and is today
   const timeOptions = useMemo(() => {
     // If no date selected, show all times (validation will catch past time on submit)
-    if (!date) return allTimeOptions;
+    if (!date) {
+      console.log('⏰ No date selected, showing all times');
+      return allTimeOptions;
+    }
     
     const today = new Date();
-    const selectedDate = new Date(date + 'T00:00:00');
+    const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
     
     // If selected date is in the future (not today), show all times
-    if (selectedDate.toDateString() !== today.toDateString()) {
+    if (date !== todayStr) {
+      console.log('⏰ Date is not today, showing all times. Selected:', date, 'Today:', todayStr);
       return allTimeOptions;
     }
     
@@ -99,12 +103,17 @@ export function CreateEvent({
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     
-    return allTimeOptions.filter(opt => {
+    console.log('⏰ Filtering times for today. Current time + buffer:', currentHour + ':' + currentMinute);
+    
+    const filtered = allTimeOptions.filter(opt => {
       const [h, m] = opt.value.split(':').map(Number);
       if (h > currentHour) return true;
       if (h === currentHour && m >= currentMinute) return true;
       return false;
     });
+    
+    console.log('⏰ Filtered to', filtered.length, 'options. First:', filtered[0]?.value);
+    return filtered;
   }, [date, allTimeOptions]);
 
   // Load cached locations on mount
