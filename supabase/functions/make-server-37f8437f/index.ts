@@ -1621,13 +1621,23 @@ app.delete("/make-server-37f8437f/events/:eventId", async (c) => {
       return c.json({ error: 'Unauthorized - not the organizer' }, 403);
     }
 
-    // Get organizer name
-    const { data: organizer } = await supabase
+    // Get organizer name from profiles or user metadata
+    let organizerName = 'The organizer';
+    const { data: profile } = await supabase
       .from('profiles')
       .select('name')
       .eq('id', user.id)
       .single();
-    const organizerName = organizer?.name || user.email?.split('@')[0] || 'The organizer';
+    
+    if (profile?.name) {
+      organizerName = profile.name;
+    } else if (user.user_metadata?.name) {
+      organizerName = user.user_metadata.name;
+    } else if (user.user_metadata?.full_name) {
+      organizerName = user.user_metadata.full_name;
+    }
+    
+    console.log(`📛 Organizer name for cancellation: "${organizerName}" (profile: ${profile?.name}, metadata: ${JSON.stringify(user.user_metadata)})`);
 
     // Format date and time for SMS
     const formatDateForSms = (dateStr: string): string => {
