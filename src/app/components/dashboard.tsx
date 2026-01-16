@@ -270,12 +270,16 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
 
       // Get the contact IDs for this user
       const contactIds = (contactsData || []).map((c: any) => c.id);
+      console.log('📒 Contacts fetched:', contactsData?.length, 'Contact IDs:', contactIds);
 
       // Fetch invite counts separately - only for this user's contacts
       const { data: invitesData, error: invitesError } = await supabase
         .from('event_invitees')
         .select('contact_id, invited_at')
         .in('contact_id', contactIds.length > 0 ? contactIds : ['00000000-0000-0000-0000-000000000000']);
+
+      console.log('📒 Invites fetched:', invitesData?.length, 'Error:', invitesError?.message);
+      console.log('📒 Invites data:', invitesData);
 
       if (invitesError) {
         console.error('Error fetching invites:', invitesError.message);
