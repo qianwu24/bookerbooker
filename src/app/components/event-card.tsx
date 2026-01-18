@@ -215,13 +215,11 @@ export function EventCard({
                   Priority
                 </span>
               )}
-              {/* Spots Badge */}
-              {event.spots && (
-                <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full flex items-center gap-1">
-                  <Users className="w-3 h-3" />
-                  {event.invitees.filter(inv => inv.status === 'accepted').length}/{event.spots} {event.spots === 1 ? 'spot' : 'spots'}
-                </span>
-              )}
+              {/* Spots Badge - shows filled/total spots */}
+              <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full flex items-center gap-1">
+                <Users className="w-3 h-3" />
+                {event.invitees.filter(inv => inv.status === 'accepted').length}/{event.spots ?? 1} {(event.spots ?? 1) === 1 ? 'spot' : 'spots'}
+              </span>
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
               <User className="w-4 h-4" />
