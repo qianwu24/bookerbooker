@@ -85,8 +85,8 @@ describe('SMS Templates', () => {
   describe('getInviteeConfirmationSms', () => {
     it('generates confirmation with location', () => {
       const sms = getInviteeConfirmationSms(baseEventData);
-      expect(sms).toContain('✅');
-      expect(sms).toContain("You're confirmed for \"Tennis Match\"");
+      expect(sms).toContain('Confirmed!');
+      expect(sms).toContain('"Tennis Match"');
       expect(sms).toContain('Tue, Jan 20');
       expect(sms).toContain('3:00 PM');
       expect(sms).toContain('at Central Park Courts');
@@ -108,7 +108,6 @@ describe('SMS Templates', () => {
   describe('getOrganizerConfirmationSms', () => {
     it('generates organizer notification with invitee name', () => {
       const sms = getOrganizerConfirmationSms(baseEventData);
-      expect(sms).toContain('🎉');
       expect(sms).toContain('Jane Smith confirmed');
       expect(sms).toContain('"Tennis Match"');
       expect(sms).toContain('Tue, Jan 20');
@@ -123,7 +122,6 @@ describe('SMS Templates', () => {
   describe('getOrganizerDeclineSms', () => {
     it('generates decline notification with invitee name', () => {
       const sms = getOrganizerDeclineSms(baseEventData);
-      expect(sms).toContain('❌');
       expect(sms).toContain('Jane Smith declined');
       expect(sms).toContain('"Tennis Match"');
     });
@@ -137,7 +135,6 @@ describe('SMS Templates', () => {
   describe('getInviteeReminderSms', () => {
     it('generates reminder with location', () => {
       const sms = getInviteeReminderSms(baseEventData);
-      expect(sms).toContain('⏰');
       expect(sms).toContain('Reminder');
       expect(sms).toContain('"Tennis Match"');
       expect(sms).toContain('starts in 1 hour');
@@ -155,7 +152,7 @@ describe('SMS Templates', () => {
   describe('getOrganizerReminderSms', () => {
     it('generates organizer reminder with location', () => {
       const sms = getOrganizerReminderSms(baseEventData);
-      expect(sms).toContain('⏰');
+      expect(sms).toContain('Reminder');
       expect(sms).toContain('Your event');
       expect(sms).toContain('"Tennis Match"');
       expect(sms).toContain('starts in 1 hour');

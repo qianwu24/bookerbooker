@@ -1,8 +1,9 @@
 /**
  * SMS Templates for Twilio
  * 
- * All templates are designed to be concise (under 160 chars when possible)
+ * All templates are designed to be concise (under 160 chars)
  * to fit in a single SMS segment and reduce costs.
+ * NO EMOJIS - emojis force Unicode encoding (70 chars/segment vs 160)
  */
 
 export interface EventSmsData {
@@ -20,9 +21,7 @@ export interface EventSmsData {
  */
 export function getInvitationSms(data: EventSmsData): string {
   const locationPart = data.location ? ` at ${data.location}` : '';
-  return `📅 ${data.organizerName} invited you to "${data.eventTitle}" on ${data.eventDate} at ${data.eventTime}${locationPart}.
-
-Reply Y to confirm, N to decline.`;
+  return `${data.organizerName} invited you to "${data.eventTitle}" on ${data.eventDate} at ${data.eventTime}${locationPart}. Reply Y to confirm, N to decline.`;
 }
 
 /**
@@ -30,21 +29,21 @@ Reply Y to confirm, N to decline.`;
  */
 export function getInviteeConfirmationSms(data: EventSmsData): string {
   const locationPart = data.location ? ` at ${data.location}` : '';
-  return `✅ You're confirmed for "${data.eventTitle}" on ${data.eventDate} at ${data.eventTime}${locationPart}. See you there!`;
+  return `Confirmed! "${data.eventTitle}" on ${data.eventDate} at ${data.eventTime}${locationPart}. See you there!`;
 }
 
 /**
  * 2b. CONFIRMATION SMS - Sent to organizer when invitee accepts
  */
 export function getOrganizerConfirmationSms(data: EventSmsData): string {
-  return `🎉 ${data.inviteeName || 'Someone'} confirmed for "${data.eventTitle}" on ${data.eventDate} at ${data.eventTime}.`;
+  return `${data.inviteeName || 'Someone'} confirmed for "${data.eventTitle}" on ${data.eventDate} at ${data.eventTime}.`;
 }
 
 /**
  * 2c. DECLINE SMS - Sent to organizer when invitee declines
  */
 export function getOrganizerDeclineSms(data: EventSmsData): string {
-  return `❌ ${data.inviteeName || 'Someone'} declined "${data.eventTitle}" on ${data.eventDate}.`;
+  return `${data.inviteeName || 'Someone'} declined "${data.eventTitle}" on ${data.eventDate}.`;
 }
 
 /**
@@ -52,7 +51,7 @@ export function getOrganizerDeclineSms(data: EventSmsData): string {
  */
 export function getInviteeReminderSms(data: EventSmsData): string {
   const locationPart = data.location ? ` at ${data.location}` : '';
-  return `⏰ Reminder: "${data.eventTitle}" starts in 1 hour (${data.eventTime})${locationPart}. See you soon!`;
+  return `Reminder: "${data.eventTitle}" starts in 1 hour (${data.eventTime})${locationPart}. See you soon!`;
 }
 
 /**
@@ -60,14 +59,14 @@ export function getInviteeReminderSms(data: EventSmsData): string {
  */
 export function getOrganizerReminderSms(data: EventSmsData): string {
   const locationPart = data.location ? ` at ${data.location}` : '';
-  return `⏰ Reminder: Your event "${data.eventTitle}" starts in 1 hour (${data.eventTime})${locationPart}.`;
+  return `Reminder: Your event "${data.eventTitle}" starts in 1 hour (${data.eventTime})${locationPart}.`;
 }
 
 /**
  * 4. CANCELLATION SMS - Sent to invitees when organizer cancels the event
  */
 export function getCancellationSms(data: EventSmsData): string {
-  return `❌ "${data.eventTitle}" on ${data.eventDate} at ${data.eventTime} has been cancelled by ${data.organizerName}.`;
+  return `CANCELLED: "${data.eventTitle}" on ${data.eventDate} at ${data.eventTime} has been cancelled by ${data.organizerName}.`;
 }
 
 /**

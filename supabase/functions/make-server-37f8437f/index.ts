@@ -537,7 +537,7 @@ interface EventSmsData {
  */
 const getInvitationSmsMessage = (data: EventSmsData): string => {
   const locationPart = data.location ? ` at ${data.location}` : '';
-  return `📅 ${data.organizerName} invited you to "${data.eventTitle}" on ${formatDateForSms(data.eventDate)} at ${formatTimeForSms(data.eventTime)}${locationPart}.\n\nReply Y to confirm, N to decline.`;
+  return `${data.organizerName} invited you to "${data.eventTitle}" on ${formatDateForSms(data.eventDate)} at ${formatTimeForSms(data.eventTime)}${locationPart}. Reply Y to confirm, N to decline.`;
 };
 
 /**
@@ -545,21 +545,21 @@ const getInvitationSmsMessage = (data: EventSmsData): string => {
  */
 const getInviteeConfirmationSmsMessage = (data: EventSmsData): string => {
   const locationPart = data.location ? ` at ${data.location}` : '';
-  return `✅ You're confirmed for "${data.eventTitle}" on ${formatDateForSms(data.eventDate)} at ${formatTimeForSms(data.eventTime)}${locationPart}. See you there!`;
+  return `Confirmed! "${data.eventTitle}" on ${formatDateForSms(data.eventDate)} at ${formatTimeForSms(data.eventTime)}${locationPart}. See you there!`;
 };
 
 /**
  * Get confirmation SMS for organizer
  */
 const getOrganizerConfirmationSmsMessage = (data: EventSmsData): string => {
-  return `🎉 ${data.inviteeName || 'Someone'} confirmed for "${data.eventTitle}" on ${formatDateForSms(data.eventDate)} at ${formatTimeForSms(data.eventTime)}.`;
+  return `${data.inviteeName || 'Someone'} confirmed for "${data.eventTitle}" on ${formatDateForSms(data.eventDate)} at ${formatTimeForSms(data.eventTime)}.`;
 };
 
 /**
  * Get decline SMS for organizer
  */
 const getOrganizerDeclineSmsMessage = (data: EventSmsData): string => {
-  return `❌ ${data.inviteeName || 'Someone'} declined "${data.eventTitle}" on ${formatDateForSms(data.eventDate)}.`;
+  return `${data.inviteeName || 'Someone'} declined "${data.eventTitle}" on ${formatDateForSms(data.eventDate)}.`;
 };
 
 /**
@@ -567,7 +567,7 @@ const getOrganizerDeclineSmsMessage = (data: EventSmsData): string => {
  */
 const getInviteeReminderSmsMessage = (data: EventSmsData): string => {
   const locationPart = data.location ? ` at ${data.location}` : '';
-  return `⏰ Reminder: "${data.eventTitle}" starts in 1 hour (${formatTimeForSms(data.eventTime)})${locationPart}. See you soon!`;
+  return `Reminder: "${data.eventTitle}" starts in 1 hour (${formatTimeForSms(data.eventTime)})${locationPart}. See you soon!`;
 };
 
 /**
@@ -575,7 +575,7 @@ const getInviteeReminderSmsMessage = (data: EventSmsData): string => {
  */
 const getOrganizerReminderSmsMessage = (data: EventSmsData): string => {
   const locationPart = data.location ? ` at ${data.location}` : '';
-  return `⏰ Reminder: Your event "${data.eventTitle}" starts in 1 hour (${formatTimeForSms(data.eventTime)})${locationPart}.`;
+  return `Reminder: Your event "${data.eventTitle}" starts in 1 hour (${formatTimeForSms(data.eventTime)})${locationPart}.`;
 };
 
 /**
@@ -1655,7 +1655,7 @@ app.delete("/make-server-37f8437f/events/:eventId", async (c) => {
     for (const inv of inviteesWithPhone) {
       try {
         const phone = inv.contact.phone;
-        const message = `❌ "${event.title}" on ${formatDateForSms(event.date)} at ${formatTimeForSms(event.time)} has been cancelled by ${organizerName}.`;
+        const message = `CANCELLED: "${event.title}" on ${formatDateForSms(event.date)} at ${formatTimeForSms(event.time)} has been cancelled by ${organizerName}.`;
         
         console.log(`📱 Sending cancellation SMS to ${phone}`);
 
@@ -1871,7 +1871,7 @@ app.post("/make-server-37f8437f/sms/webhook", async (c) => {
 
     // Build response message
     const responseMessage = newStatus === 'accepted'
-      ? `✅ You're confirmed for "${event.title}" on ${formatDateForSms(event.date)} at ${formatTimeForSms(event.time)}. See you there!`
+      ? `Confirmed! "${event.title}" on ${formatDateForSms(event.date)} at ${formatTimeForSms(event.time)}. See you there!`
       : `Your decline has been recorded for "${event.title}". Thank you for letting us know.`;
 
     // If user declined and this is FCFS mode, we should promote the next person in line
