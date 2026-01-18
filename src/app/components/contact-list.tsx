@@ -27,6 +27,23 @@ export function ContactList({ contacts, onDeleteContact }: ContactListProps) {
     });
   };
 
+  // Format phone number for display: +1 (555) 123-4567
+  const formatPhoneDisplay = (phone: string): string => {
+    if (!phone) return '';
+    const digits = phone.replace(/\D/g, '');
+    
+    if (digits.length === 10) {
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    } else if (digits.length === 11 && digits.startsWith('1')) {
+      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    } else if (digits.length > 10) {
+      const countryCode = digits.slice(0, digits.length - 10);
+      const rest = digits.slice(-10);
+      return `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+    }
+    return phone;
+  };
+
   if (contacts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4">
@@ -106,7 +123,7 @@ export function ContactList({ contacts, onDeleteContact }: ContactListProps) {
                       {contact.phone && (
                         <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
                           <Phone className="w-4 h-4 flex-shrink-0" />
-                          <span>{contact.phone}</span>
+                          <span>{formatPhoneDisplay(contact.phone)}</span>
                         </div>
                       )}
 

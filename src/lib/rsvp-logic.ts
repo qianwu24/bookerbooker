@@ -20,6 +20,8 @@ export interface RsvpResult {
   error?: string;
   shouldPromoteNext?: boolean;
   promotedInvitee?: Invitee;
+  isEventFull?: boolean;
+  spotsRemaining?: number;
 }
 
 /**
@@ -28,20 +30,23 @@ export interface RsvpResult {
  * 
  * Business rules for FIRST-COME-FIRST-SERVE mode:
  * - All invitees are invited at the same time (all have status 'invited')
- * - First person to accept wins
+ * - First N people (where N = spots) to accept win
  * - No promotion needed on decline (everyone was already invited)
  * 
  * Business rules for PRIORITY mode:
  * - Invitees are invited one at a time in priority order
  * - First invitee (priority 0) is invited, rest are pending
  * - When someone declines, next pending invitee is promoted to invited
- * - Only one person can accept
+ * - Only N people (where N = spots) can accept
+ * 
+ * @param spots - Number of spots available (default 1)
  */
 export function processRsvpAction(
   invitees: Invitee[],
   targetInviteeEmail: string,
   action: 'confirm' | 'decline',
-  inviteMode: InviteMode = 'priority'
+  inviteMode: InviteMode = 'priority',
+  spots: number = 1
 ): RsvpResult {
   const targetInvitee = invitees.find(
     (inv) => inv.email.toLowerCase() === targetInviteeEmail.toLowerCase()
@@ -51,17 +56,20 @@ export function processRsvpAction(
     return { success: false, error: 'Invitee not found' };
   }
 
-  // Check if someone already accepted
-  const alreadyAccepted = invitees.find(
+  // Count how many have already accepted (excluding current invitee)
+  const acceptedCount = invitees.filter(
     (inv) => inv.status === 'accepted' && inv.email.toLowerCase() !== targetInviteeEmail.toLowerCase()
-  );
+  ).length;
 
   if (action === 'confirm') {
-    // Rule: Only one person can accept (applies to both modes)
-    if (alreadyAccepted) {
+    // Rule: Only N people can accept (where N = spots)
+    if (acceptedCount >= spots) {
       return {
         success: false,
-        error: 'This event has already been confirmed by another invitee',
+        error: spots === 1 
+          ? 'This event has already been confirmed by another invitee'
+          : `This event is full (${spots} spot${spots > 1 ? 's' : ''} filled)`,
+        isEventFull: true,
       };
     }
 
@@ -75,9 +83,14 @@ export function processRsvpAction(
       }
     }
 
+    // Check if this acceptance fills all spots
+    const willBeFull = (acceptedCount + 1) >= spots;
+
     return {
       success: true,
       newStatus: 'accepted',
+      isEventFull: willBeFull,
+      spotsRemaining: spots - acceptedCount - 1,
     };
   }
 

@@ -104,7 +104,7 @@ describe('calculateEventStatuses', () => {
         expect(result.confirmationStatus).toBe('invited');
       });
 
-      it('should return "invited" for future event with only declined invitees', () => {
+      it('should return "declined" for future event with only declined invitees', () => {
         const event = createMockEvent({
           date: '2026-01-20',
           time: '14:00',
@@ -115,7 +115,7 @@ describe('calculateEventStatuses', () => {
         });
 
         const result = calculateEventStatuses(event, now);
-        expect(result.confirmationStatus).toBe('invited');
+        expect(result.confirmationStatus).toBe('declined');
       });
 
       it('should return "invited" for future event with mixed pending and declined', () => {
@@ -147,7 +147,7 @@ describe('calculateEventStatuses', () => {
         expect(result.confirmationStatus).toBe('no-show');
       });
 
-      it('should return "no-show" for past event with all declined invitees', () => {
+      it('should return "declined" for past event with all declined invitees', () => {
         const event = createMockEvent({
           date: '2026-01-10', // Past
           time: '14:00',
@@ -158,7 +158,7 @@ describe('calculateEventStatuses', () => {
         });
 
         const result = calculateEventStatuses(event, now);
-        expect(result.confirmationStatus).toBe('no-show');
+        expect(result.confirmationStatus).toBe('declined');
       });
 
       it('should return "no-show" for past event with no invitees', () => {

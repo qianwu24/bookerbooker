@@ -202,10 +202,25 @@ export function CreateEvent({
     return phone;
   };
 
-  // Format phone number for display: (XXX) XXX-XXXX
+  // Format phone number for display: +1 (555) 123-4567
   const formatPhoneDisplay = (phone: string): string => {
+    if (!phone) return '';
     const digits = phone.replace(/\D/g, '');
+    
     if (digits.length === 0) return '';
+    if (digits.length === 10) {
+      // US number without country code: (555) 123-4567
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    } else if (digits.length === 11 && digits.startsWith('1')) {
+      // US/CA with country code: +1 (555) 123-4567
+      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    } else if (digits.length > 10) {
+      // International: +XX (XXX) XXX-XXXX
+      const countryCode = digits.slice(0, digits.length - 10);
+      const rest = digits.slice(-10);
+      return `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+    }
+    // Fallback for short numbers (during input)
     if (digits.length <= 3) return `(${digits}`;
     if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
@@ -1015,11 +1030,11 @@ export function CreateEvent({
 
                     <div className="flex-1">
                       <p className="text-sm">{invitee.name}</p>
-                      <p className="text-xs text-gray-500">{invitee.email || invitee.phone}</p>
+                      <p className="text-xs text-gray-500">{invitee.email || (invitee.phone ? formatPhoneDisplay(invitee.phone) : '')}</p>
                       {invitee.email && invitee.phone && (
                         <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
                           <Phone className="w-3 h-3" />
-                          {invitee.phone}
+                          {formatPhoneDisplay(invitee.phone)}
                         </p>
                       )}
                     </div>

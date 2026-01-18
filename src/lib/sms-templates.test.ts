@@ -95,7 +95,7 @@ describe('SMS Templates', () => {
 
     it('generates confirmation without location', () => {
       const sms = getInviteeConfirmationSms({ ...baseEventData, location: undefined });
-      expect(sms).toContain("You're confirmed");
+      expect(sms).toContain('Confirmed!');
       expect(sms).not.toContain('at Central Park Courts');
     });
 

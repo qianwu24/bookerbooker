@@ -49,6 +49,29 @@ export function EventCard({
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
   };
 
+  // Format phone number for display: +1 (555) 123-4567
+  const formatPhoneDisplay = (phone: string): string => {
+    if (!phone) return '';
+    // Remove all non-digits
+    const digits = phone.replace(/\D/g, '');
+    
+    // Handle different lengths
+    if (digits.length === 10) {
+      // US number without country code: (555) 123-4567
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    } else if (digits.length === 11 && digits.startsWith('1')) {
+      // US/CA with country code: +1 (555) 123-4567
+      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    } else if (digits.length > 10) {
+      // International: +XX XXX XXX XXXX
+      const countryCode = digits.slice(0, digits.length - 10);
+      const rest = digits.slice(-10);
+      return `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+    }
+    // Fallback: return original
+    return phone;
+  };
+
   const getStatusColor = (status: InviteeStatus) => {
     switch (status) {
       case 'invited':
@@ -192,6 +215,13 @@ export function EventCard({
                   Priority
                 </span>
               )}
+              {/* Spots Badge */}
+              {event.spots && (
+                <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  {event.invitees.filter(inv => inv.status === 'accepted').length}/{event.spots} {event.spots === 1 ? 'spot' : 'spots'}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
               <User className="w-4 h-4" />
@@ -328,7 +358,7 @@ export function EventCard({
                           {invitee.phone && (
                             <div className="flex items-center gap-1.5 text-xs text-gray-500">
                               <Phone className="w-3 h-3" />
-                              <span>{invitee.phone}</span>
+                              <span>{formatPhoneDisplay(invitee.phone)}</span>
                             </div>
                           )}
                         </div>
@@ -388,7 +418,7 @@ export function EventCard({
                             {invitee.phone && (
                               <div className="flex items-center gap-1.5 text-xs text-gray-500">
                                 <Phone className="w-3 h-3" />
-                                <span>{invitee.phone}</span>
+                                <span>{formatPhoneDisplay(invitee.phone)}</span>
                               </div>
                             )}
                           </div>

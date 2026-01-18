@@ -48,10 +48,26 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
   const [phoneSaveMessage, setPhoneSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const EVENTS_PER_PAGE = 10;
 
-  // Format phone number for display: (XXX) XXX-XXXX
+  // Format phone number for display: +1 (555) 123-4567
   const formatPhoneDisplay = (phone: string): string => {
+    if (!phone) return '';
+    // Remove all non-digits
     const digits = phone.replace(/\D/g, '');
-    if (digits.length === 0) return '';
+    
+    // Handle different lengths
+    if (digits.length === 10) {
+      // US number without country code: (555) 123-4567
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    } else if (digits.length === 11 && digits.startsWith('1')) {
+      // US/CA with country code: +1 (555) 123-4567
+      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    } else if (digits.length > 10) {
+      // International: +XX (XXX) XXX-XXXX
+      const countryCode = digits.slice(0, digits.length - 10);
+      const rest = digits.slice(-10);
+      return `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+    }
+    // Fallback for short numbers
     if (digits.length <= 3) return `(${digits}`;
     if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
@@ -974,7 +990,7 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                                     <p className="text-sm font-medium text-gray-900">
                                       {invitee.name}
                                     </p>
-                                    <p className="text-xs text-gray-500">{invitee.email || invitee.phone}</p>
+                                    <p className="text-xs text-gray-500">{invitee.email || (invitee.phone ? formatPhoneDisplay(invitee.phone) : '')}</p>
                                   </div>
                                 </div>
                               </button>
@@ -1108,7 +1124,7 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                   )}
                 </div>
 
-                {/* Clear No-Show Events Button - only show if there are no-shows */}
+                {/* Clear Past Events Button - only show if there are unconfirmed past events */}
                 {getNoShowEvents().length > 0 && (
                   <button
                     onClick={() => setShowClearNoShowDialog(true)}
@@ -1116,7 +1132,7 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                     title="Delete past events with no confirmed attendees"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Clear No-Shows
+                    Clear Past Events
                     <span className="ml-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
                       {getNoShowEvents().length}
                     </span>
@@ -1349,13 +1365,13 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
         )}
       </main>
 
-      {/* Clear No-Show Events Confirmation Dialog */}
+      {/* Clear Past Events Confirmation Dialog */}
       <AlertDialog open={showClearNoShowDialog} onOpenChange={setShowClearNoShowDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Clear No-Show Events?</AlertDialogTitle>
+            <AlertDialogTitle>Clear Past Events?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete <strong>{getNoShowEvents().length}</strong> past event{getNoShowEvents().length !== 1 ? 's' : ''} that had no confirmed attendees.
+              This will permanently delete <strong>{getNoShowEvents().length}</strong> past event{getNoShowEvents().length !== 1 ? 's' : ''} where no one accepted the invitation.
               <br /><br />
               This action cannot be undone.
             </AlertDialogDescription>
