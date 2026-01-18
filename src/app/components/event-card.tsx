@@ -296,62 +296,115 @@ export function EventCard({
 
         {/* Invitees List */}
         <div>
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center justify-between w-full text-sm text-gray-700 hover:text-gray-900 transition-colors"
-          >
-            <span>
-              {event.inviteMode === 'first-come-first-serve' ? 'Invitees' : 'Priority Invitees'} ({event.invitees.length})
-            </span>
-            {expanded ? (
-              <ChevronUp className="w-4 h-4" />
-            ) : (
-              <ChevronDown className="w-4 h-4" />
-            )}
-          </button>
-
-          {expanded && (
-            <div className="mt-3 space-y-2">
-              {event.invitees
-                .sort((a, b) => a.priority - b.priority)
-                .map((invitee, index) => (
-                  <div
-                    key={invitee.email || invitee.phone || index}
-                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
-                  >
-                    {/* Only show priority number if in priority mode */}
-                    {event.inviteMode !== 'first-come-first-serve' && (
-                      <div className="flex items-center justify-center min-w-[2rem] h-8 bg-indigo-600 text-white rounded-full text-sm">
-                        {index + 1}
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{invitee.name}</p>
-                      <div className="flex flex-col gap-0.5">
-                        {invitee.email && (
-                          <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                            <Mail className="w-3 h-3" />
-                            <span>{invitee.email}</span>
-                          </div>
-                        )}
-                        {invitee.phone && (
-                          <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                            <Phone className="w-3 h-3" />
-                            <span>{invitee.phone}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <span
-                      className={`px-2 py-1 rounded text-xs ${getStatusColor(
-                        invitee.status
-                      )}`}
+          {event.invitees.length <= 3 ? (
+            // Show all invitees directly without expansion for small lists
+            <>
+              <span className="text-sm text-gray-700">
+                {event.inviteMode === 'first-come-first-serve' ? 'Invitees' : 'Priority Invitees'} ({event.invitees.length})
+              </span>
+              <div className="mt-3 space-y-2">
+                {event.invitees
+                  .sort((a, b) => a.priority - b.priority)
+                  .map((invitee, index) => (
+                    <div
+                      key={invitee.email || invitee.phone || index}
+                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
                     >
-                      {getStatusLabel(invitee.status)}
-                    </span>
-                  </div>
-                ))}
-            </div>
+                      {/* Only show priority number if in priority mode */}
+                      {event.inviteMode !== 'first-come-first-serve' && (
+                        <div className="flex items-center justify-center min-w-[2rem] h-8 bg-indigo-600 text-white rounded-full text-sm">
+                          {index + 1}
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{invitee.name}</p>
+                        <div className="flex flex-col gap-0.5">
+                          {invitee.email && (
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                              <Mail className="w-3 h-3" />
+                              <span>{invitee.email}</span>
+                            </div>
+                          )}
+                          {invitee.phone && (
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                              <Phone className="w-3 h-3" />
+                              <span>{invitee.phone}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded text-xs ${getStatusColor(
+                          invitee.status
+                        )}`}
+                      >
+                        {getStatusLabel(invitee.status)}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </>
+          ) : (
+            // Show expandable list for larger lists
+            <>
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="flex items-center justify-between w-full text-sm text-gray-700 hover:text-gray-900 transition-colors"
+              >
+                <span>
+                  {event.inviteMode === 'first-come-first-serve' ? 'Invitees' : 'Priority Invitees'} ({event.invitees.length})
+                </span>
+                {expanded ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </button>
+
+              {expanded && (
+                <div className="mt-3 space-y-2">
+                  {event.invitees
+                    .sort((a, b) => a.priority - b.priority)
+                    .map((invitee, index) => (
+                      <div
+                        key={invitee.email || invitee.phone || index}
+                        className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                      >
+                        {/* Only show priority number if in priority mode */}
+                        {event.inviteMode !== 'first-come-first-serve' && (
+                          <div className="flex items-center justify-center min-w-[2rem] h-8 bg-indigo-600 text-white rounded-full text-sm">
+                            {index + 1}
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{invitee.name}</p>
+                          <div className="flex flex-col gap-0.5">
+                            {invitee.email && (
+                              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                                <Mail className="w-3 h-3" />
+                                <span>{invitee.email}</span>
+                              </div>
+                            )}
+                            {invitee.phone && (
+                              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                                <Phone className="w-3 h-3" />
+                                <span>{invitee.phone}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <span
+                          className={`px-2 py-1 rounded text-xs ${getStatusColor(
+                            invitee.status
+                          )}`}
+                        >
+                          {getStatusLabel(invitee.status)}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </>
           )}
         </div>
 
