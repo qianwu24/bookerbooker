@@ -579,6 +579,13 @@ const getOrganizerReminderSmsMessage = (data: EventSmsData): string => {
 };
 
 /**
+ * Get event full SMS for remaining invitees
+ */
+const getEventFullSmsMessage = (data: EventSmsData): string => {
+  return `"${data.eventTitle}" on ${formatDateForSms(data.eventDate)} is now full. Thanks for your interest!`;
+};
+
+/**
  * Send invitation SMS to invitee
  */
 const sendInvitationSms = async (
@@ -641,6 +648,17 @@ const sendOrganizerReminderSms = async (
   eventData: EventSmsData
 ): Promise<boolean> => {
   const message = getOrganizerReminderSmsMessage(eventData);
+  return sendSms({ to: phone, message });
+};
+
+/**
+ * Send event full SMS to invitee
+ */
+const sendEventFullSms = async (
+  phone: string,
+  eventData: EventSmsData
+): Promise<boolean> => {
+  const message = getEventFullSmsMessage(eventData);
   return sendSms({ to: phone, message });
 };
 
@@ -727,15 +745,24 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
     return c.json({ error: 'Invitee not found' }, 404);
   }
 
-  // Business rule: Check if someone else already accepted (only one person can accept)
-  const alreadyAccepted = allInvitees.find(
-    (inv) => inv.status === 'accepted' && inv.contact.email.toLowerCase() !== inviteeEmail.toLowerCase()
-  );
+  // Fetch event details to get spots count
+  const { data: eventForSpots } = await supabase
+    .from('events')
+    .select('spots')
+    .eq('id', eventId)
+    .single();
+  
+  const maxSpots = eventForSpots?.spots ?? 1;
 
-  if (action === 'confirm' && alreadyAccepted) {
+  // Business rule: Check if all spots are filled
+  const acceptedCount = allInvitees.filter(
+    (inv) => inv.status === 'accepted'
+  ).length;
+
+  if (action === 'confirm' && acceptedCount >= maxSpots) {
     const html = buildResultPage({
-      title: 'Already Confirmed',
-      detail: 'Sorry, this event has already been confirmed by another invitee.',
+      title: 'Event Full',
+      detail: `Sorry, all ${maxSpots === 1 ? 'spots are' : maxSpots + ' spots are'} already filled for this event.`,
       eventTitle: '',
       eventWhen: '',
       accentColor: '#f59e0b',
@@ -854,6 +881,26 @@ app.get("/make-server-37f8437f/rsvp", async (c) => {
     // Send notification SMS to organizer if they have a phone
     if (event.organizer?.phone) {
       await sendOrganizerConfirmationSms(event.organizer.phone, eventSmsData);
+    }
+
+    // Check if all spots are now filled - notify remaining invitees
+    const newAcceptedCount = acceptedCount + 1; // Include this acceptance
+    if (newAcceptedCount >= maxSpots) {
+      // Get all remaining invited/pending invitees who haven't responded
+      const remainingInvitees = allInvitees.filter(
+        (inv) => 
+          (inv.status === 'invited' || inv.status === 'pending') &&
+          inv.contact.email.toLowerCase() !== inviteeEmail.toLowerCase()
+      );
+
+      // Notify each remaining invitee that the event is full
+      for (const remaining of remainingInvitees) {
+        if (remaining.contact?.phone) {
+          await sendEventFullSms(remaining.contact.phone, eventSmsData);
+        }
+      }
+
+      console.log(`Event ${eventId} is now full (${newAcceptedCount}/${maxSpots} spots). Notified ${remainingInvitees.length} remaining invitees.`);
     }
   }
 
@@ -1096,6 +1143,7 @@ app.post("/make-server-37f8437f/events", async (c) => {
         location: eventData.location,
         time_zone: eventData.timeZone || null,
         duration_minutes: eventData.durationMinutes ?? null,
+        spots: eventData.spots ?? 1, // Default to 1 spot
         invite_mode: eventData.inviteMode || 'priority',
         auto_promote_after_minutes: eventData.autoPromoteInterval ?? 30,
         organizer_id: user.id,
@@ -1438,6 +1486,7 @@ app.get("/make-server-37f8437f/events", async (c) => {
       location: event.location,
       timeZone: event.time_zone,
       durationMinutes: event.duration_minutes,
+      spots: event.spots ?? 1,
       inviteMode: event.invite_mode || 'priority',
       organizer: {
         email: event.organizer.email,

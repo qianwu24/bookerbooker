@@ -26,6 +26,7 @@ export interface Event {
   location: string;
   timeZone?: string;
   durationMinutes?: number;
+  spots?: number; // Number of spots available (default 1)
   organizer: {
     email: string;
     name: string;

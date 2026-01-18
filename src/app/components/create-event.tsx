@@ -27,7 +27,8 @@ export function CreateEvent({
   const [locationHistory, setLocationHistory] = useState<string[]>([]);
   const [showRecentLocations, setShowRecentLocations] = useState(false);
   const [invitees, setInvitees] = useState<Invitee[]>([]);
-  const MAX_INVITEES = 1; // Limit to 1 invitee for MVP
+  const MAX_INVITEES = 5; // Limit to 5 invitees for MVP
+  const [spots, setSpots] = useState<number>(1); // Number of spots available (default 1)
   const [newInviteeEmail, setNewInviteeEmail] = useState('');
   const [newInviteeName, setNewInviteeName] = useState('');
   const [newInviteePhone, setNewInviteePhone] = useState('');
@@ -447,6 +448,7 @@ export function CreateEvent({
       location: trimmedLocation,
       timeZone: timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       durationMinutes,
+      spots, // Number of spots available
       invitees,
       inviteMode,
       autoPromoteInterval: inviteMode === 'priority' ? autoPromoteInterval : undefined,
@@ -715,6 +717,42 @@ export function CreateEvent({
                   </div>
                 </div>
               </button>
+            </div>
+          </div>
+
+          {/* Spots Selector */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <Users className="w-5 h-5 text-amber-600 mt-0.5" />
+              <div className="flex-1">
+                <label htmlFor="spots" className="block text-sm font-semibold text-amber-900 mb-1">
+                  Spots Available
+                </label>
+                <p className="text-sm text-gray-700 mb-3">
+                  How many people can accept? Once all spots are filled, remaining invitees will be notified the event is full.
+                </p>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    {[1, 2, 3, 4, 5].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setSpots(num)}
+                        className={`w-10 h-10 rounded-lg font-medium transition-colors ${
+                          spots === num
+                            ? 'bg-amber-600 text-white'
+                            : 'bg-white text-gray-700 hover:bg-amber-100 border border-amber-200'
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-sm text-gray-600">
+                    {spots === 1 ? '(Singles)' : spots === 2 ? '(Doubles)' : `(${spots} players)`}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
