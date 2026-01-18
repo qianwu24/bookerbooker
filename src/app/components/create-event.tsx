@@ -27,6 +27,7 @@ export function CreateEvent({
   const [locationHistory, setLocationHistory] = useState<string[]>([]);
   const [showRecentLocations, setShowRecentLocations] = useState(false);
   const [invitees, setInvitees] = useState<Invitee[]>([]);
+  const MAX_INVITEES = 1; // Limit to 1 invitee for MVP
   const [newInviteeEmail, setNewInviteeEmail] = useState('');
   const [newInviteeName, setNewInviteeName] = useState('');
   const [newInviteePhone, setNewInviteePhone] = useState('');
@@ -241,6 +242,12 @@ export function CreateEvent({
 
   // Add invitee from contact
   const handleAddFromContact = (contact: Contact) => {
+    // Check if we've reached the max invitees limit
+    if (invitees.length >= MAX_INVITEES) {
+      setDuplicateAlert(`Maximum ${MAX_INVITEES} invitee${MAX_INVITEES > 1 ? 's' : ''} allowed per event.`);
+      setTimeout(() => setDuplicateAlert(null), 3000);
+      return;
+    }
     // For SMS-only MVP, contact must have a phone number
     if (!contact.phone) {
       setDuplicateAlert("This contact doesn't have a phone number");
@@ -282,6 +289,13 @@ export function CreateEvent({
   );
 
   const handleAddInvitee = () => {
+    // Check if we've reached the max invitees limit
+    if (invitees.length >= MAX_INVITEES) {
+      setDuplicateAlert(`Maximum ${MAX_INVITEES} invitee${MAX_INVITEES > 1 ? 's' : ''} allowed per event.`);
+      setTimeout(() => setDuplicateAlert(null), 3000);
+      return;
+    }
+    
     // Clear previous errors
     const newErrors = { ...errors };
     delete newErrors.inviteeEmail;
@@ -801,7 +815,8 @@ export function CreateEvent({
                 : 'Add all the people you want to invite. Everyone will receive the invitation at the same time.'}
             </p>
 
-            {/* Add Invitee Form */}
+            {/* Add Invitee Form - only show if under limit */}
+            {invitees.length < MAX_INVITEES && (
             <div className="flex flex-col sm:flex-row gap-2 mb-4">
               <div className="flex-1">
                 <input
@@ -866,9 +881,10 @@ export function CreateEvent({
                 Add
               </button>
             </div>
+            )}
 
-            {/* Contact Picker */}
-            {availableContacts.length > 0 && (
+            {/* Contact Picker - only show if under limit */}
+            {invitees.length < MAX_INVITEES && availableContacts.length > 0 && (
               <div className="mb-4 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4">
                 <button
                   type="button"
