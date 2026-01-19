@@ -45,7 +45,7 @@ export function LoginScreen({ onBack }: LoginScreenProps) {
         
         <h1 className="text-center text-indigo-600 mb-2">Booker</h1>
         <p className="text-center text-gray-600 mb-8">
-          Smart scheduling with priority-based invitations
+          Smart scheduling made simple
         </p>
 
         <button

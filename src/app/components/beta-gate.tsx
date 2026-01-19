@@ -3,8 +3,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
-// Hardcoded beta password - change this when needed
-const BETA_PASSWORD = 'tennisprince';
+// Hardcoded beta passwords - change these when needed
+const BETA_PASSWORDS = ['tennisprince', 'buywulf'];
 const STORAGE_KEY = 'scheduler_beta_access';
 
 export function useBetaAccess() {
@@ -42,7 +42,7 @@ export function BetaGate({ onAccessGranted }: BetaGateProps) {
 
     // Small delay to prevent brute force
     setTimeout(() => {
-      if (password === BETA_PASSWORD) {
+      if (BETA_PASSWORDS.includes(password)) {
         localStorage.setItem(STORAGE_KEY, 'granted');
         onAccessGranted();
       } else {

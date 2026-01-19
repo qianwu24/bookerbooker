@@ -30,9 +30,9 @@ export function HomePage({ onSignIn }: HomePageProps) {
         <div className="max-w-7xl mx-auto">
           <div className="text-center">
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-6">
-              Smart Scheduling with
+              Smart Scheduling
               <span className="block text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
-                Priority-Based Invites
+                Made Simple
               </span>
             </h1>
             {/* Feature cards hidden for now
@@ -223,7 +223,7 @@ export function HomePage({ onSignIn }: HomePageProps) {
             Ready to Streamline Your Scheduling?
           </h2>
           <p className="text-xl text-gray-600 mb-10">
-            Join Booker today and experience priority-based event management.
+            Join Booker today and experience effortless event management.
           </p>
           <Button onClick={onSignIn} size="lg" className="text-lg px-12 py-6 bg-indigo-600 hover:bg-indigo-700">
             Sign In with Google <ArrowRight className="ml-2 w-5 h-5" />
@@ -238,7 +238,7 @@ export function HomePage({ onSignIn }: HomePageProps) {
             <BookerLogo className="w-6 h-6 text-indigo-400" />
             <span className="text-xl font-bold text-white">Booker</span>
           </div>
-          <p className="mb-2">Smart scheduling with priority-based invitations</p>
+          <p className="mb-2">Smart scheduling made simple</p>
           <p className="text-sm">© 2026 Booker. All rights reserved.</p>
         </div>
       </footer>
