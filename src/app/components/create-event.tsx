@@ -452,8 +452,14 @@ export function CreateEvent({
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      // Scroll to top to show errors
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Scroll to the relevant section based on error type
+      if (validationErrors.invitees && validationErrors.invitees.includes('spots')) {
+        // Invitees < spots error - scroll to spots section
+        document.getElementById('spots-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        // Other errors - scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
       return;
     }
 
@@ -739,7 +745,7 @@ export function CreateEvent({
           </div>
 
           {/* Spots Selector */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div id="spots-section" className="bg-amber-50 border border-amber-200 rounded-xl p-4">
             <div className="flex items-start gap-3">
               <Users className="w-5 h-5 text-amber-600 mt-0.5" />
               <div className="flex-1">
