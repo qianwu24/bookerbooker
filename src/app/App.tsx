@@ -7,7 +7,7 @@ import { supabase } from './utils/supabase-client';
 
 // Beta password protection - hardcoded for reliability
 // Set to false when ready for public launch
-const BETA_MODE_ENABLED = true;
+const BETA_MODE_ENABLED = false;
 
 export default function App() {
   const { hasAccess, grantAccess, revokeAccess } = useBetaAccess();
