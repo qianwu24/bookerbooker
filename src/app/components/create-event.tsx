@@ -431,6 +431,8 @@ export function CreateEvent({
     
     if (invitees.length === 0) {
       validationErrors.invitees = 'Add at least one invitee';
+    } else if (invitees.length < spots) {
+      validationErrors.invitees = `You need at least ${spots} ${spots === 1 ? 'invitee' : 'invitees'} for ${spots} ${spots === 1 ? 'spot' : 'spots'}. Currently you have ${invitees.length}.`;
     }
 
     if (!durationMinutes || durationMinutes <= 0) {
