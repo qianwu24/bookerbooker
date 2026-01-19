@@ -767,6 +767,15 @@ export function CreateEvent({
                     {spots === 1 ? '(Singles)' : spots === 2 ? '(Doubles)' : `(${spots} players)`}
                   </span>
                 </div>
+                {/* Warning when invitees < spots */}
+                {invitees.length > 0 && invitees.length < spots && (
+                  <div className="mt-3 p-2 bg-orange-100 border border-orange-300 rounded-lg">
+                    <p className="text-sm text-orange-800 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" />
+                      You have {invitees.length} {invitees.length === 1 ? 'invitee' : 'invitees'} but {spots} spots. Add {spots - invitees.length} more {spots - invitees.length === 1 ? 'invitee' : 'invitees'} to fill all spots.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
