@@ -439,6 +439,63 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
     performDelete();
   };
 
+  // Add a new contact manually
+  const handleAddContact = async (contactData: { name: string; email?: string; phone?: string }): Promise<boolean> => {
+    try {
+      // Check for duplicates
+      const existingByEmail = contactData.email 
+        ? contacts.find(c => c.email?.toLowerCase() === contactData.email?.toLowerCase())
+        : null;
+      const existingByPhone = contactData.phone
+        ? contacts.find(c => c.phone === contactData.phone)
+        : null;
+      
+      if (existingByEmail) {
+        alert(`A contact with email "${contactData.email}" already exists.`);
+        return false;
+      }
+      if (existingByPhone) {
+        alert(`A contact with phone "${contactData.phone}" already exists.`);
+        return false;
+      }
+
+      const { data, error } = await supabase
+        .from('contacts')
+        .insert({
+          owner_id: user.id,
+          name: contactData.name,
+          email: contactData.email || null,
+          phone: contactData.phone || null,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding contact:', error.message);
+        alert('Failed to add contact: ' + error.message);
+        return false;
+      }
+
+      // Add to local state
+      setContacts((prev) => [...prev, {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        eventCount: 0,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      }]);
+      
+      console.log('✅ Contact added:', data.name);
+      return true;
+    } catch (error) {
+      console.error('Unexpected error adding contact:', error);
+      alert('An error occurred while adding the contact.');
+      return false;
+    }
+  };
+
   // Cancel an event with confirmation
   const handleCancelEvent = (eventId: string) => {
     const event = events.find(e => e.id === eventId);
@@ -1271,6 +1328,7 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
           <ContactList
             contacts={contacts}
             onDeleteContact={handleDeleteContact}
+            onAddContact={handleAddContact}
           />
         ) : (
           <div className="max-w-4xl mx-auto bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-6">

@@ -1,14 +1,19 @@
-import { User, Mail, Calendar, Trash2, Search, Phone } from 'lucide-react';
+import { User, Mail, Calendar, Trash2, Search, Phone, Plus, X, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import type { Contact } from '../types';
 
 interface ContactListProps {
   contacts: Contact[];
   onDeleteContact: (contactId: string) => void;
+  onAddContact?: (contact: { name: string; email?: string; phone?: string }) => Promise<boolean>;
 }
 
-export function ContactList({ contacts, onDeleteContact }: ContactListProps) {
+export function ContactList({ contacts, onDeleteContact, onAddContact }: ContactListProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newContact, setNewContact] = useState({ name: '', email: '', phone: '' });
+  const [isAdding, setIsAdding] = useState(false);
+  const [addError, setAddError] = useState('');
 
   const filteredContacts = contacts.filter(
     (contact) =>
@@ -44,16 +49,147 @@ export function ContactList({ contacts, onDeleteContact }: ContactListProps) {
     return phone;
   };
 
-  if (contacts.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 px-4">
-        <div className="w-24 h-24 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full flex items-center justify-center mb-6">
-          <User className="w-12 h-12 text-indigo-600" />
+  const handleAddContact = async () => {
+    if (!newContact.name.trim()) {
+      setAddError('Name is required');
+      return;
+    }
+    if (!newContact.email.trim() && !newContact.phone.trim()) {
+      setAddError('Email or phone number is required');
+      return;
+    }
+    
+    setIsAdding(true);
+    setAddError('');
+    
+    try {
+      const success = await onAddContact?.({
+        name: newContact.name.trim(),
+        email: newContact.email.trim() || undefined,
+        phone: newContact.phone.trim() || undefined,
+      });
+      
+      if (success) {
+        setNewContact({ name: '', email: '', phone: '' });
+        setShowAddForm(false);
+      }
+    } catch (error) {
+      setAddError('Failed to add contact');
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  // Add Contact Form Component
+  const AddContactForm = () => (
+    <div className="bg-white rounded-xl border border-indigo-200 shadow-sm p-5 mb-4">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-gray-900">Add New Contact</h3>
+        <button
+          onClick={() => {
+            setShowAddForm(false);
+            setNewContact({ name: '', email: '', phone: '' });
+            setAddError('');
+          }}
+          className="p-1 text-gray-400 hover:text-gray-600 rounded"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+      
+      <div className="space-y-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+          <input
+            type="text"
+            value={newContact.name}
+            onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
+            placeholder="John Doe"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+          />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">No Contacts Yet</h2>
-        <p className="text-gray-600 text-center max-w-md">
-          Your contact list will automatically populate when you invite people to events. Start creating events to build your network!
-        </p>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input
+            type="email"
+            value={newContact.email}
+            onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+            placeholder="john@example.com"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+          <input
+            type="tel"
+            value={newContact.phone}
+            onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
+            placeholder="(555) 123-4567"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+          />
+        </div>
+        
+        {addError && (
+          <p className="text-sm text-red-600">{addError}</p>
+        )}
+        
+        <div className="flex gap-2 pt-2">
+          <button
+            onClick={handleAddContact}
+            disabled={isAdding}
+            className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isAdding ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                Add Contact
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              setShowAddForm(false);
+              setNewContact({ name: '', email: '', phone: '' });
+              setAddError('');
+            }}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (contacts.length === 0 && !showAddForm) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="flex flex-col items-center justify-center py-16 px-4">
+          <div className="w-24 h-24 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full flex items-center justify-center mb-6">
+            <User className="w-12 h-12 text-indigo-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">No Contacts Yet</h2>
+          <p className="text-gray-600 text-center max-w-md mb-6">
+            Your contact list will automatically populate when you invite people to events, or you can add contacts manually.
+          </p>
+          {onAddContact && (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              Add Your First Contact
+            </button>
+          )}
+        </div>
+        {showAddForm && <AddContactForm />}
       </div>
     );
   }
@@ -69,7 +205,19 @@ export function ContactList({ contacts, onDeleteContact }: ContactListProps) {
               {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'} saved
             </p>
           </div>
+          {onAddContact && !showAddForm && (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Add Contact
+            </button>
+          )}
         </div>
+
+        {/* Add Contact Form */}
+        {showAddForm && <AddContactForm />}
 
         {/* Search Bar */}
         <div className="relative">

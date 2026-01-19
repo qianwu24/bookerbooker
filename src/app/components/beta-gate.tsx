@@ -3,8 +3,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
-// Hardcoded beta passwords - change these when needed
-const BETA_PASSWORDS = ['tennisprince', 'buywulf'];
+// Beta passwords from environment variables (comma-separated)
+const BETA_PASSWORDS = (import.meta.env.VITE_BETA_PASSWORDS || '').split(',').map((p: string) => p.trim()).filter(Boolean);
 const STORAGE_KEY = 'scheduler_beta_access';
 
 export function useBetaAccess() {
