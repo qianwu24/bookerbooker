@@ -101,8 +101,8 @@ export function ContactList({ contacts, onDeleteContact, onAddContact }: Contact
     }
   };
 
-  // Add Contact Form Component
-  const AddContactForm = () => (
+  // Inline Add Contact Form JSX (not a component to avoid focus loss on re-render)
+  const addContactFormJSX = (
     <div className="bg-white rounded-xl border border-indigo-200 shadow-sm p-5 mb-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-gray-900">Add New Contact</h3>
@@ -231,7 +231,7 @@ export function ContactList({ contacts, onDeleteContact, onAddContact }: Contact
             </button>
           )}
         </div>
-        {showAddForm && <AddContactForm />}
+        {showAddForm && addContactFormJSX}
       </div>
     );
   }
@@ -259,7 +259,7 @@ export function ContactList({ contacts, onDeleteContact, onAddContact }: Contact
         </div>
 
         {/* Add Contact Form */}
-        {showAddForm && <AddContactForm />}
+        {showAddForm && addContactFormJSX}
 
         {/* Search Bar */}
         <div className="relative">
