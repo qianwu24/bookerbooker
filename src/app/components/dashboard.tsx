@@ -1380,34 +1380,36 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
               <p className="text-xs text-gray-600 mb-3">
                 Add your phone number to receive SMS notifications as an event organizer.
               </p>
-              <div className="flex gap-2">
-                <select
-                  value={userPhoneCountryCode}
-                  onChange={(e) => setUserPhoneCountryCode(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white text-gray-700 min-w-[80px]"
-                >
-                  <option value="+1">CA +1</option>
-                  <option value="+1">US +1</option>
-                  <option value="+44">UK +44</option>
-                  <option value="+86">CN +86</option>
-                  <option value="+91">IN +91</option>
-                  <option value="+81">JP +81</option>
-                  <option value="+82">KR +82</option>
-                  <option value="+61">AU +61</option>
-                  <option value="+33">FR +33</option>
-                  <option value="+49">DE +49</option>
-                </select>
-                <input
-                  type="tel"
-                  value={formatPhoneDisplay(userPhone)}
-                  onChange={handleUserPhoneChange}
-                  placeholder="(555) 123-4567"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                />
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex gap-2 flex-1">
+                  <select
+                    value={userPhoneCountryCode}
+                    onChange={(e) => setUserPhoneCountryCode(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white text-gray-700 min-w-[80px]"
+                  >
+                    <option value="+1">CA +1</option>
+                    <option value="+1">US +1</option>
+                    <option value="+44">UK +44</option>
+                    <option value="+86">CN +86</option>
+                    <option value="+91">IN +91</option>
+                    <option value="+81">JP +81</option>
+                    <option value="+82">KR +82</option>
+                    <option value="+61">AU +61</option>
+                    <option value="+33">FR +33</option>
+                    <option value="+49">DE +49</option>
+                  </select>
+                  <input
+                    type="tel"
+                    value={formatPhoneDisplay(userPhone)}
+                    onChange={handleUserPhoneChange}
+                    placeholder="(555) 123-4567"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none min-w-0"
+                  />
+                </div>
                 <button
                   onClick={saveUserPhone}
                   disabled={savingPhone}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                   {savingPhone ? (
                     <>

@@ -12,6 +12,7 @@ export function ContactList({ contacts, onDeleteContact, onAddContact }: Contact
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [newContact, setNewContact] = useState({ name: '', email: '', phone: '' });
+  const [phoneCountryCode, setPhoneCountryCode] = useState('+1');
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState('');
 
@@ -49,13 +50,28 @@ export function ContactList({ contacts, onDeleteContact, onAddContact }: Contact
     return phone;
   };
 
+  // Format phone input as user types: (555) 123-4567
+  const formatPhoneInput = (value: string): string => {
+    const digits = value.replace(/\D/g, '');
+    if (digits.length === 0) return '';
+    if (digits.length <= 3) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+  };
+
+  // Handle phone input change
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneInput(e.target.value);
+    setNewContact({ ...newContact, phone: formatted });
+  };
+
   const handleAddContact = async () => {
     if (!newContact.name.trim()) {
       setAddError('Name is required');
       return;
     }
-    if (!newContact.email.trim() && !newContact.phone.trim()) {
-      setAddError('Email or phone number is required');
+    if (!newContact.phone.trim()) {
+      setAddError('Phone number is required');
       return;
     }
     
@@ -63,14 +79,19 @@ export function ContactList({ contacts, onDeleteContact, onAddContact }: Contact
     setAddError('');
     
     try {
+      // Combine country code with phone digits
+      const phoneDigits = newContact.phone.replace(/\D/g, '');
+      const fullPhone = `${phoneCountryCode}${phoneDigits}`;
+      
       const success = await onAddContact?.({
         name: newContact.name.trim(),
         email: newContact.email.trim() || undefined,
-        phone: newContact.phone.trim() || undefined,
+        phone: fullPhone,
       });
       
       if (success) {
         setNewContact({ name: '', email: '', phone: '' });
+        setPhoneCountryCode('+1');
         setShowAddForm(false);
       }
     } catch (error) {
@@ -89,6 +110,7 @@ export function ContactList({ contacts, onDeleteContact, onAddContact }: Contact
           onClick={() => {
             setShowAddForm(false);
             setNewContact({ name: '', email: '', phone: '' });
+            setPhoneCountryCode('+1');
             setAddError('');
           }}
           className="p-1 text-gray-400 hover:text-gray-600 rounded"
@@ -121,14 +143,33 @@ export function ContactList({ contacts, onDeleteContact, onAddContact }: Contact
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-          <input
-            type="tel"
-            value={newContact.phone}
-            onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
-            placeholder="(555) 123-4567"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+          <div className="flex gap-2">
+            <select
+              value={phoneCountryCode}
+              onChange={(e) => setPhoneCountryCode(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white text-gray-700 min-w-[80px]"
+            >
+              <option value="+1">CA +1</option>
+              <option value="+1">US +1</option>
+              <option value="+44">UK +44</option>
+              <option value="+86">CN +86</option>
+              <option value="+91">IN +91</option>
+              <option value="+81">JP +81</option>
+              <option value="+82">KR +82</option>
+              <option value="+61">AU +61</option>
+              <option value="+33">FR +33</option>
+              <option value="+49">DE +49</option>
+            </select>
+            <input
+              type="tel"
+              value={newContact.phone}
+              onChange={handlePhoneChange}
+              placeholder="(555) 123-4567"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+              required
+            />
+          </div>
         </div>
         
         {addError && (
@@ -157,6 +198,7 @@ export function ContactList({ contacts, onDeleteContact, onAddContact }: Contact
             onClick={() => {
               setShowAddForm(false);
               setNewContact({ name: '', email: '', phone: '' });
+              setPhoneCountryCode('+1');
               setAddError('');
             }}
             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
