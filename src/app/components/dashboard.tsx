@@ -802,12 +802,12 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {/* Phone Number Setup Banner */}
       {!userPhone && !loading && (
         <div className="bg-amber-50 border-b border-amber-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
               <div className="flex items-center gap-3">
                 <Phone className="w-5 h-5 text-amber-600" />
                 <p className="text-sm text-amber-800">
@@ -871,9 +871,9 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
       </header>
 
       {/* Navigation */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white border-b border-gray-200 overflow-x-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex gap-4">
+          <nav className="flex gap-4 min-w-max">
             <button
               onClick={() => setView('list')}
               className={`px-4 py-3 border-b-2 transition-colors ${
@@ -915,20 +915,20 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
         {view === 'list' && (
           <div className="mb-6">
             {/* Quick Date Filters with Date Range Button */}
-            <div className="flex items-center justify-between gap-4 mb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-3">
               <div className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-gray-600" />
                 <h3 className="font-semibold text-gray-900">Filters</h3>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {/* Invitee Filter Button */}
                 <div className="relative">
                   <button
                     onClick={() => setShowInviteeFilter(!showInviteeFilter)}
-                    className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
+                    className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-colors text-sm sm:text-base"
                   >
                     <Users className="w-4 h-4" />
-                    Filter by Invitee
+                    <span className="hidden sm:inline">Filter by</span> Invitee
                     {selectedInvitees.length > 0 && (
                       <span className="ml-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full">
                         {selectedInvitees.length}
@@ -938,26 +938,32 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
 
                   {/* Invitee Filter Dropdown */}
                   {showInviteeFilter && (
-                    <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 w-96 max-h-96 overflow-hidden z-50">
-                      <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <Users className="w-5 h-5 text-indigo-600" />
-                            <h3 className="font-semibold text-gray-900">Filter by Invitees</h3>
+                    <>
+                      {/* Mobile backdrop */}
+                      <div 
+                        className="fixed inset-0 bg-black/20 z-40 sm:hidden"
+                        onClick={() => setShowInviteeFilter(false)}
+                      />
+                      <div className="fixed inset-x-4 bottom-4 sm:absolute sm:inset-auto sm:right-0 sm:bottom-auto sm:top-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 w-auto sm:w-96 max-h-[70vh] sm:max-h-96 overflow-hidden z-50">
+                        <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Users className="w-5 h-5 text-indigo-600" />
+                              <h3 className="font-semibold text-gray-900">Filter by Invitees</h3>
+                            </div>
+                            <button
+                              onClick={() => setShowInviteeFilter(false)}
+                              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                              <X className="w-5 h-5 text-gray-600" />
+                            </button>
                           </div>
-                          <button
-                            onClick={() => setShowInviteeFilter(false)}
-                            className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                          >
-                            <X className="w-5 h-5 text-gray-600" />
-                          </button>
+                          {selectedInvitees.length > 0 && (
+                            <p className="text-xs text-gray-500">
+                              {selectedInvitees.length} invitee{selectedInvitees.length !== 1 ? 's' : ''} selected
+                            </p>
+                          )}
                         </div>
-                        {selectedInvitees.length > 0 && (
-                          <p className="text-xs text-gray-500">
-                            {selectedInvitees.length} invitee{selectedInvitees.length !== 1 ? 's' : ''} selected
-                          </p>
-                        )}
-                      </div>
 
                       <div className="overflow-y-auto max-h-64 p-4">
                         {getAllInvitees().length === 0 ? (
@@ -1000,7 +1006,7 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                         )}
                       </div>
 
-                      <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex gap-3">
+                      <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 sm:px-6 py-4 flex gap-3">
                         <button
                           onClick={() => {
                             clearInviteeFilter();
@@ -1017,21 +1023,22 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                           Apply
                         </button>
                       </div>
-                    </div>
+                      </div>
+                    </>
                   )}
                 </div>
 
                 {/* Scheduled Filter Toggle */}
                 <button
                   onClick={() => setOnlyScheduled((prev) => !prev)}
-                  className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+                  className={`flex items-center gap-2 px-3 sm:px-4 py-2 border rounded-lg transition-colors text-sm sm:text-base ${
                     onlyScheduled
                       ? 'bg-green-50 border-green-300 text-green-700 shadow-inner'
                       : 'bg-white border-gray-300 text-gray-700 hover:border-indigo-300 hover:bg-indigo-50'
                   }`}
                 >
                   <CheckCircle className="w-4 h-4" />
-                  Scheduled only
+                  <span className="hidden sm:inline">Scheduled</span><span className="sm:hidden">Sched.</span> only
                   {onlyScheduled && (
                     <span className="ml-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">On</span>
                   )}
@@ -1041,10 +1048,10 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                 <div className="relative">
                   <button
                     onClick={() => setShowDateRangePicker(!showDateRangePicker)}
-                    className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
+                    className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-colors text-sm sm:text-base"
                   >
                     <Filter className="w-4 h-4" />
-                    Date Range
+                    <span className="hidden sm:inline">Date</span> Range
                     {(startDate || endDate) && (
                       <span className="ml-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full">
                         Active
@@ -1054,28 +1061,34 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
 
                   {/* Date Range Picker Dropdown */}
                   {showDateRangePicker && (
-                    <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 w-80 p-6 z-50">
-                      <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-5 h-5 text-indigo-600" />
-                          <h3 className="font-semibold text-gray-900">Select Date Range</h3>
+                    <>
+                      {/* Mobile backdrop */}
+                      <div 
+                        className="fixed inset-0 bg-black/20 z-40 sm:hidden"
+                        onClick={() => setShowDateRangePicker(false)}
+                      />
+                      <div className="fixed inset-x-4 bottom-4 sm:absolute sm:inset-auto sm:right-0 sm:bottom-auto sm:top-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 w-auto sm:w-80 p-4 sm:p-6 z-50">
+                        <div className="flex items-center justify-between mb-4 sm:mb-6">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-5 h-5 text-indigo-600" />
+                            <h3 className="font-semibold text-gray-900">Select Date Range</h3>
+                          </div>
+                          <button
+                            onClick={() => setShowDateRangePicker(false)}
+                            className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                          >
+                            <X className="w-5 h-5 text-gray-600" />
+                          </button>
                         </div>
-                        <button
-                          onClick={() => setShowDateRangePicker(false)}
-                          className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                          <X className="w-5 h-5 text-gray-600" />
-                        </button>
-                      </div>
 
-                      <div className="space-y-4">
-                        <div>
-                          <label htmlFor="modal-start-date" className="block text-sm text-gray-600 mb-2">
-                            Start Date
-                          </label>
-                          <input
-                            id="modal-start-date"
-                            type="date"
+                        <div className="space-y-4">
+                          <div>
+                            <label htmlFor="modal-start-date" className="block text-sm text-gray-600 mb-2">
+                              Start Date
+                            </label>
+                            <input
+                              id="modal-start-date"
+                              type="date"
                             value={startDate}
                             onChange={(e) => {
                               setStartDate(e.target.value);
@@ -1120,8 +1133,9 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                             Apply
                           </button>
                         </div>
+                        </div>
                       </div>
-                    </div>
+                    </>
                   )}
                 </div>
 
@@ -1129,11 +1143,11 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                 {getNoShowEvents().length > 0 && (
                   <button
                     onClick={() => setShowClearNoShowDialog(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-white text-red-600 border border-red-200 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors"
+                    className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white text-red-600 border border-red-200 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors text-sm sm:text-base"
                     title="Delete past events with no confirmed attendees"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Clear Past Events
+                    <span className="hidden sm:inline">Clear Past</span><span className="sm:hidden">Clear</span>
                     <span className="ml-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
                       {getNoShowEvents().length}
                     </span>
@@ -1142,20 +1156,20 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
               </div>
             </div>
             
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
               <button
                 onClick={() => {
                   setSelectedQuickFilter('all');
                   setStartDate('');
                   setEndDate('');
                 }}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`px-3 sm:px-4 py-2 rounded-lg transition-all whitespace-nowrap text-sm sm:text-base ${
                   selectedQuickFilter === 'all' && !startDate && !endDate
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'bg-white text-gray-700 border border-gray-300 hover:border-indigo-300 hover:bg-indigo-50'
                 }`}
               >
-                All Events ({events.length})
+                All ({events.length})
               </button>
               <button
                 onClick={() => {
@@ -1163,7 +1177,7 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                   setStartDate('');
                   setEndDate('');
                 }}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`px-3 sm:px-4 py-2 rounded-lg transition-all whitespace-nowrap text-sm sm:text-base ${
                   selectedQuickFilter === 'today' && !startDate && !endDate
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'bg-white text-gray-700 border border-gray-300 hover:border-indigo-300 hover:bg-indigo-50'
@@ -1177,7 +1191,7 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                   setStartDate('');
                   setEndDate('');
                 }}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`px-3 sm:px-4 py-2 rounded-lg transition-all whitespace-nowrap text-sm sm:text-base ${
                   selectedQuickFilter === 'tomorrow' && !startDate && !endDate
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'bg-white text-gray-700 border border-gray-300 hover:border-indigo-300 hover:bg-indigo-50'
@@ -1191,13 +1205,13 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                   setStartDate('');
                   setEndDate('');
                 }}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`px-3 sm:px-4 py-2 rounded-lg transition-all whitespace-nowrap text-sm sm:text-base ${
                   selectedQuickFilter === 'week' && !startDate && !endDate
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'bg-white text-gray-700 border border-gray-300 hover:border-indigo-300 hover:bg-indigo-50'
                 }`}
               >
-                This Week ({countEventsByFilter().week})
+                Week ({countEventsByFilter().week})
               </button>
               <button
                 onClick={() => {
@@ -1205,13 +1219,13 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
                   setStartDate('');
                   setEndDate('');
                 }}
-                className={`px-4 py-2 rounded-lg transition-all ${
+                className={`px-3 sm:px-4 py-2 rounded-lg transition-all whitespace-nowrap text-sm sm:text-base ${
                   selectedQuickFilter === 'past' && !startDate && !endDate
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'bg-white text-gray-700 border border-gray-300 hover:border-indigo-300 hover:bg-indigo-50'
                 }`}
               >
-                Past Events ({countEventsByFilter().past})
+                Past ({countEventsByFilter().past})
               </button>
             </div>
             
