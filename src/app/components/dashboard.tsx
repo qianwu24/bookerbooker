@@ -119,6 +119,7 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
       location: rawEvent.location || '',
       timeZone: rawEvent.time_zone || rawEvent.timeZone || timeZone,
       durationMinutes: rawEvent.duration_minutes ?? rawEvent.durationMinutes ?? 60,
+      spots: rawEvent.spots ?? 1,
       organizer: rawEvent.organizer || { email: user.email, name: user.name },
       invitees,
       inviteMode: rawEvent.inviteMode || 'priority',
