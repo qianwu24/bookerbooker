@@ -755,8 +755,7 @@ export function CreateEvent({
                 <p className="text-sm text-gray-700 mb-3">
                   How many people can accept? Once all spots are filled, remaining invitees will be notified the event is full.
                 </p>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                     {[1, 2, 3, 4, 5].map((num) => (
                       <button
                         key={num}
@@ -772,10 +771,6 @@ export function CreateEvent({
                       </button>
                     ))}
                   </div>
-                  <span className="text-sm text-gray-600">
-                    {spots === 1 ? '(Singles)' : spots === 2 ? '(Doubles)' : `(${spots} players)`}
-                  </span>
-                </div>
                 {/* Warning when invitees < spots */}
                 {invitees.length > 0 && invitees.length < spots && (
                   <div className="mt-3 p-2 bg-orange-100 border border-orange-300 rounded-lg">
