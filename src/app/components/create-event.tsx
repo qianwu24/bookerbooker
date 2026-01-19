@@ -38,6 +38,7 @@ export function CreateEvent({
   const [durationMinutes, setDurationMinutes] = useState<number>(60);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showContactPicker, setShowContactPicker] = useState(false);
+  const [contactSearchQuery, setContactSearchQuery] = useState('');
   const [duplicateAlert, setDuplicateAlert] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -952,7 +953,10 @@ export function CreateEvent({
               <div className="mb-4 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4">
                 <button
                   type="button"
-                  onClick={() => setShowContactPicker(!showContactPicker)}
+                  onClick={() => {
+                    setShowContactPicker(!showContactPicker);
+                    if (showContactPicker) setContactSearchQuery('');
+                  }}
                   className="w-full px-4 py-3 bg-white text-gray-900 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-between shadow-sm border border-gray-200"
                 >
                   <div className="flex items-center gap-2">
@@ -966,30 +970,56 @@ export function CreateEvent({
                 </button>
                 
                 {showContactPicker && (
-                  <div className="mt-3 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-inner">
-                    {availableContacts.map(contact => (
-                      <button
-                        key={contact.id || contact.email || contact.phone}
-                        type="button"
-                        onClick={() => handleAddFromContact(contact)}
-                        className="w-full px-4 py-3 text-left hover:bg-indigo-50 transition-colors border-b border-gray-100 last:border-b-0 flex items-center gap-3 group"
-                      >
-                        <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                          <span className="text-white font-semibold">
-                            {contact.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 group-hover:text-indigo-600">
-                            {contact.name}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate">
-                            {contact.phone ? formatPhoneDisplay(contact.phone.replace(/^\+1/, '')) : 'No phone'}
-                          </p>
-                        </div>
-                        <Plus className="w-5 h-5 text-gray-400 group-hover:text-indigo-600" />
-                      </button>
-                    ))}
+                  <div className="mt-3 bg-white border border-gray-200 rounded-lg shadow-inner">
+                    {/* Search Input */}
+                    <div className="p-3 border-b border-gray-200">
+                      <input
+                        type="text"
+                        value={contactSearchQuery}
+                        onChange={(e) => setContactSearchQuery(e.target.value)}
+                        placeholder="Search contacts by name..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"
+                        autoFocus
+                      />
+                    </div>
+                    {/* Filtered Contact List */}
+                    <div className="max-h-52 overflow-y-auto">
+                      {availableContacts
+                        .filter(contact => 
+                          contact.name.toLowerCase().includes(contactSearchQuery.toLowerCase())
+                        )
+                        .map(contact => (
+                          <button
+                            key={contact.id || contact.email || contact.phone}
+                            type="button"
+                            onClick={() => {
+                              handleAddFromContact(contact);
+                              setContactSearchQuery('');
+                            }}
+                            className="w-full px-4 py-3 text-left hover:bg-indigo-50 transition-colors border-b border-gray-100 last:border-b-0 flex items-center gap-3 group"
+                          >
+                            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="text-white font-semibold">
+                                {contact.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 group-hover:text-indigo-600">
+                                {contact.name}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate">
+                                {contact.phone ? formatPhoneDisplay(contact.phone.replace(/^\+1/, '')) : 'No phone'}
+                              </p>
+                            </div>
+                            <Plus className="w-5 h-5 text-gray-400 group-hover:text-indigo-600" />
+                          </button>
+                        ))}
+                      {availableContacts.filter(contact => 
+                        contact.name.toLowerCase().includes(contactSearchQuery.toLowerCase())
+                      ).length === 0 && (
+                        <p className="px-4 py-3 text-sm text-gray-500 text-center">No contacts found</p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
