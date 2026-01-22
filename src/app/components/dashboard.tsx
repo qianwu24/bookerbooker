@@ -706,11 +706,12 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
     const weekRange = getThisWeekRange();
     const today = new Date();
     
+    const todayDateStr = todayStr; // YYYY-MM-DD format
     return {
       today: events.filter(e => e.date === todayStr).length,
       tomorrow: events.filter(e => e.date === tomorrowStr).length,
       week: events.filter(e => e.date >= weekRange.start && e.date <= weekRange.end).length,
-      past: events.filter(e => new Date(e.date) < today).length,
+      past: events.filter(e => e.date < todayDateStr).length,
     };
   };
 
@@ -796,8 +797,8 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
           eventsToFilter = eventsToFilter.filter(e => e.date >= weekRange.start && e.date <= weekRange.end);
           break;
         case 'past':
-          const today = new Date();
-          eventsToFilter = eventsToFilter.filter(e => new Date(e.date) < today);
+          const todayDateStr = getTodayString();
+          eventsToFilter = eventsToFilter.filter(e => e.date < todayDateStr);
           break;
         default:
           // 'all' - no filtering
@@ -834,19 +835,21 @@ export function Dashboard({ user, accessToken, onLogout }: DashboardProps) {
   // Format date for display
   const formatDateDisplay = (dateStr: string) => {
     try {
-      const date = new Date(dateStr);
+      // Parse as local date to avoid timezone shift (YYYY-MM-DD parsed as UTC otherwise)
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const date = new Date(year, month - 1, day); // month is 0-indexed
       if (isNaN(date.getTime())) return dateStr;
       
       const today = new Date();
+      today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
       
-      const dateOnly = date.toISOString().split('T')[0];
-      const todayStr = today.toISOString().split('T')[0];
-      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+      const dateOnly = new Date(date);
+      dateOnly.setHours(0, 0, 0, 0);
       
-      if (dateOnly === todayStr) return 'Today';
-      if (dateOnly === tomorrowStr) return 'Tomorrow';
+      if (dateOnly.getTime() === today.getTime()) return 'Today';
+      if (dateOnly.getTime() === tomorrow.getTime()) return 'Tomorrow';
       
       return date.toLocaleDateString('en-US', { 
         weekday: 'short', 
