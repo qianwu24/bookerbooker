@@ -25,7 +25,12 @@ export function ContactList({ contacts, onDeleteContact, onAddContact }: Contact
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'N/A';
-    const date = new Date(dateStr);
+    // For ISO timestamps, use as-is; for YYYY-MM-DD, parse as local
+    const date = dateStr.includes('T') 
+      ? new Date(dateStr)
+      : new Date(dateStr.split('-').map(Number).reduce((d, v, i) => 
+          i === 0 ? new Date(v, 0, 1) : i === 1 ? (d.setMonth(v - 1), d) : (d.setDate(v), d)
+        , new Date()));
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',

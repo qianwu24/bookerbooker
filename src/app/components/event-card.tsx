@@ -32,7 +32,9 @@ export function EventCard({
   const isAcceptedByCurrentUser = currentUserInvitee?.status === 'accepted';
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    // Parse as local date to avoid timezone shift (YYYY-MM-DD parsed as UTC otherwise)
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day); // month is 0-indexed
     return date.toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
