@@ -42,6 +42,14 @@ export function CreateEvent({
   const [duplicateAlert, setDuplicateAlert] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
+  // Format a Date as local YYYY-MM-DD (avoid UTC shift)
+  const formatLocalDate = (d: Date) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Generate date options (next 90 days)
   const generateDateOptions = () => {
     const options = [];
@@ -49,7 +57,7 @@ export function CreateEvent({
     for (let i = 0; i < 90; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
-      const value = d.toISOString().split('T')[0]; // YYYY-MM-DD
+      const value = formatLocalDate(d); // YYYY-MM-DD (local)
       const label = d.toLocaleDateString('en-US', { 
         weekday: 'short', 
         month: 'short', 
@@ -90,7 +98,7 @@ export function CreateEvent({
     }
     
     const today = new Date();
-    const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+    const todayStr = formatLocalDate(today); // YYYY-MM-DD (local)
     
     // If selected date is in the future (not today), show all times
     if (date !== todayStr) {
